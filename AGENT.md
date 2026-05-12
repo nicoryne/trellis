@@ -124,3 +124,41 @@ The `vault/` directory is a structured, interlinked knowledge wiki maintained us
 5. **Don't modify `vault/raw/`.** Source documents in `vault/raw/` are immutable.
 6. **Follow design guidelines.** All UI work must follow `.agent/design-guidelines.md` — dark mode primary, amber/gold accents, no emoji in microcopy.
 7. **Preserve documentation.** Do not remove or alter existing comments, docstrings, or documentation that are unrelated to your changes.
+8. **Verify developer identity and scope.** If the developer's identity isn't specified, or if it cannot be determined locally using environment/session tools, explicitly ask the user which of the three developers (Keith, Gabe, or Nicolo) they are. Cross-reference their identity against the implementation plan boundaries; if they request edits outside their assigned domain, notify them that they may be intervening in another developer's area.
+9. **Maintain a linear Git history.** Always rebase feature branches instead of merging `main` into them. Follow the Git Rebase Guide below to prevent merge commits and keep history clean.
+
+---
+
+## Git Rebase Guide
+
+To prevent merge commits and maintain a strictly linear Git history during parallel AI-assisted development, follow this workflow when syncing with `main`:
+
+### 1. Update your local main branch
+```bash
+git checkout main
+git pull origin main
+```
+
+### 2. Rebase your feature branch onto main
+```bash
+git checkout <your-feature-branch>
+git rebase main
+```
+
+### 3. Resolve conflicts if they arise
+If two agents modified overlapping imports or shared contracts, Git will pause the rebase.
+- Resolve the conflicts directly in your affected files.
+- Stage the resolved files:
+```bash
+git add <resolved-file>
+```
+- Continue the rebase (do not commit):
+```bash
+git rebase --continue
+```
+
+### 4. Force-push to your remote feature branch
+Because rebasing rewrites commit history, you must push with lease to update the remote branch safely:
+```bash
+git push origin <your-feature-branch> --force-with-lease
+```
