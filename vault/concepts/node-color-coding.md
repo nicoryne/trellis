@@ -1,0 +1,45 @@
+---
+title: Node color coding
+type: concept
+status: active
+tags: [design, color, trellis]
+sources: [trellis-design-guidelines]
+created: 2026-05-12
+updated: 2026-05-12
+---
+
+# Node color coding
+
+The palette assigned to each node type in [[trellis|Trellis]]'s graph views. Governed by a **strict rule**: no graph node color may overlap with the accent palette (gold/amber) or the semantic palette (success/warning/danger/info). This keeps **UI signals visually distinct from data**.
+
+## Palette (per [[trellis-design-guidelines]] §2.5)
+
+| Node Type | Hex | Visual |
+|---|---|---|
+| `insight` | `#9d4edd` | Purple — primary user-generated content type |
+| `matter` | `#06d6a0` | Teal — case/matter container |
+| `party` | `#ef476f` | Magenta — clients, opposing parties |
+| `lawyer` | `#118ab2` | Steel blue — firm lawyers, opposing counsel |
+| `judge` | `#073b4c` (with outline) | Deep slate with white outline — judicial figures |
+| `witness` | `#ff9f1c` | Orange — expert and fact witnesses |
+| `concept` | `#8338ec` | Violet — legal concepts, doctrines |
+| `precedent` | `#3a86ff` | Sky blue — case law |
+| `statute` | `#fb5607` | Vermillion — statutory authority |
+
+## Edges
+
+- At rest: neutral `#30363d` (`border-default`).
+- On hover: brighten to `#7d8590` (`text-secondary`).
+- **Cited edges during [[query-overlay-animation|query overlay]]**: illuminate to `accent-primary` (amber). This is the **only** place an accent color appears in graph visualization — it signals "active cited path."
+
+## The strict rule in plain terms
+
+If a user sees gold in the graph, they should know it means *"this is part of the answer being cited right now."* Not *"this is a node type."* That separation is what makes the [[query-overlay-animation]] readable without legend.
+
+## Implementation hook
+
+Tokens are pre-defined in `tokens.css` ([[trellis-design-guidelines]] §13) as `--node-insight`, `--node-matter`, etc., for direct use in [[cytoscape-js]] style sheets.
+
+## Sources
+
+- [[trellis-design-guidelines]]

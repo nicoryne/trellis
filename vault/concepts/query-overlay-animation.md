@@ -1,0 +1,56 @@
+---
+title: Query-overlay graph animation
+type: concept
+status: active
+tags: [ui, motion, trellis, hero]
+sources: [trellis-product-requirements, trellis-design-guidelines, trellis-product-brief]
+created: 2026-05-12
+updated: 2026-05-12
+---
+
+# Query-overlay graph animation
+
+The **signature visual moment of [[trellis|Trellis]]**. The thing judges (and customers) remember. When any team member submits a query in the chat, the chat dims, the team graph fades in at viewport center, cited nodes pulse to full opacity in rank order, then the overlay fades back as the response streams.
+
+## Choreography (frame by frame)
+
+1. User submits the query in the chat input.
+2. **Chat window dims to 30% opacity within 150ms**; input disabled.
+3. A new full-screen overlay (`bg-canvas` at 95% with **backdrop blur**) fades in over **400ms**.
+4. The team graph **fades in at center over 400ms**, positioned with the graph's centroid aligned to the viewport center. All nodes start at **15% opacity**.
+5. As the backend returns the cited node IDs (typically 1–2 seconds), **cited nodes pulse to full opacity in waves** — **one node every 150ms**, in order of relevance rank. Connecting edges between cited nodes illuminate to `accent-primary` as their endpoint nodes light up.
+6. The overlay **holds full state for ~1 second** after all cited nodes are lit — the eye needs time to register the network.
+7. As Gemini streams the response, **the overlay fades back over 600ms**; chat un-dims. Cited node IDs in the streaming text are clickable chips referencing the same node IDs.
+
+## Design requirements (per [[trellis-design-guidelines]] §8.3)
+
+- Use `requestAnimationFrame` for the pulse waves to keep **60fps**.
+- Each pulse is a brief scale (1.0 → 1.15 → 1.0) over **300ms** paired with opacity (15% → 100%).
+- Edges illuminate via `stroke` and `stroke-width` transitions; **no flash**.
+- Honor `prefers-reduced-motion`: skip pulse, set final state directly, no fade.
+- During the overlay, the chat input is non-interactive; the user can press **Escape** to dismiss.
+
+## Why it matters
+
+Three things land simultaneously in this animation:
+
+1. **"The answer is grounded in firm knowledge"** — visible because the graph is on screen.
+2. **"These specific insights, not generic AI"** — visible because the cited nodes are the ones that pulse.
+3. **"This firm has a brain"** — visible because the graph has shape.
+
+The animation **converts an architectural claim into a perceptual moment**. This is why [[trellis-design-guidelines]] reserves the `deliberate` motion duration (600–800ms) specifically for this surface.
+
+## Risks and fallbacks (per [[trellis-project-architecture]] §11)
+
+- **The most likely thing to slip after Pass 2 generalization.** Fallback: simplified animation — just dim the chat, no graph fly-in.
+- Performance on lower-end machines is an open concern; the `prefers-reduced-motion` fallback exists but does not address devices that *can* animate but stutter.
+
+## Relation to [[hero-moments]]
+
+This is Hero Moment 3 of three. The other two are the publish-with-redaction modal (Hero 1) and the chat-with-citations surface (Hero 2). Most design effort concentrates on these three.
+
+## Sources
+
+- [[trellis-product-requirements]]
+- [[trellis-design-guidelines]]
+- [[trellis-product-brief]]
