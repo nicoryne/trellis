@@ -23,7 +23,11 @@ A partner leading the litigation practice group. The **validator** persona for [
 
 The brief and PRD list the Practice Group Lead among the three demo accounts to make the **role model legible** to judges and to fix the data shape. In MVP the role does not exercise distinct UI; the demo does not meaningfully switch to this account.
 
-> ⚠ Demo risk: judges might ask "what does the Lead actually see?" The honest answer is "the same as the Lawyer in MVP, with promotion and approval surfaces shipping in V1." Rehearse this answer.
+**Decided**: no MVP differentiator. Same access as Lawyer. The role earns its dashboard in V1 where it flags insights for promotion to firm-wide. (see [[practice-group-lead-mvp-distinctiveness]])
+
+**Rehearsed Q&A talk-track** for judges who ask "what does the Lead actually do?":
+
+> *"In the MVP, the Lead has the same access as a lawyer — the role exists in our data model and gets its own dashboard in V1 where they flag insights for promotion to firm-wide. We chose to scope down so we could nail the privacy and retrieval moments."*
 
 ## Relations
 

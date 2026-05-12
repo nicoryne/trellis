@@ -3,7 +3,7 @@ title: Trellis demo narrative (5 minutes)
 type: topic
 status: active
 tags: [trellis, demo, hackathon]
-sources: [trellis-product-brief, trellis-product-requirements]
+sources: [trellis-product-brief, trellis-product-requirements, trellis-context-dump]
 created: 2026-05-12
 updated: 2026-05-12
 ---
@@ -50,6 +50,20 @@ Frame what just happened:
 
 Mention V1: **native apps, on-device AI, [[mcp-server|MCP integration]] with the rest of the legal AI stack**. This is where the [[pluggable-brain]] tagline lands.
 
+## Refusal segment (deliberate, ~15 seconds)
+
+Build a dedicated refusal beat into the demo. Trigger a query the seed corpus does **not** answer, and use it to land the privilege-guarantee point. Decided: the refusal is **shown as a feature**, not encountered as a failure. (see [[demo-off-script-query-handling]])
+
+**Talk-track when refusal appears** (whether deliberately or in Q&A):
+
+> *"Watch what happens when we ask something the firm hasn't captured knowledge about — the system refuses rather than fabricating. That's the privilege guarantee made visible. A lawyer would never want a hallucinated answer they might cite in a brief."*
+
+## Seed corpus and backup queries
+
+- **MVP seed corpus**: Philippine laws, articles, and previous cases. The firm brain delivers useful answers from day one (matches [[adoption-strategy]] Pillar 2). (see [[acme-litigation-partners]])
+- **Backup query coverage**: seed is designed so **2–3 additional queries beyond the canonical one** produce strong cited answers. If a judge asks off-script and the question happens to match a backup, the demo holds. If it doesn't match, the refusal segment above lands the point.
+- **Seed voice**: conclusory + brief narrative justification, 2–3 sentences each — see [[acme-seed-voice-tone]].
+
 ## Pre-demo checklist
 
 - All three demo accounts work; role differences visible (even if MVP role differences are limited)
@@ -62,9 +76,10 @@ Mention V1: **native apps, on-device AI, [[mcp-server|MCP integration]] with the
 
 - **Network flakiness** → cloud AI ([[gemini]], [[whisper]]) is the single point of failure. Have a cached canonical query ready.
 - **Account switch friction** → logout/login is ~5 seconds; rehearse to remove fumbling.
-- **The canonical query** is hardcoded; what if judges ask a different question? Refusal path is the answer — rehearse triggering it deliberately.
+- **The canonical query** is hardcoded; what if judges ask a different question? Resolved: rehearsed refusal talk-track + backup-query coverage + deliberate refusal segment. (see [[demo-off-script-query-handling]])
 
 ## Sources
 
 - [[trellis-product-brief]]
 - [[trellis-product-requirements]]
+- [[trellis-context-dump]]

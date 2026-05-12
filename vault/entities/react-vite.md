@@ -26,6 +26,18 @@ Frontend stack for the [[trellis]] MVP single-page app. React 18 for the UI; Vit
 - **HTTP**: TanStack Query + fetch (caching, retries, mutations).
 - **Deployed on**: Vercel free tier.
 
+## Bundle-size budget
+
+- **Main bundle**: under **500KB gzipped**.
+- **Time-to-interactive**: under **2 seconds** on typical broadband.
+- **Code-split boundaries**: `chat`, `capture`, and `graph` views each as a separate chunk (users hit login → home; they don't need chat code until navigating there).
+- **Lazy-load heavy libraries**:
+  - [[cytoscape-js|Cytoscape.js]] — only when navigating to a graph view
+  - WaveSurfer.js — only when audio capture starts
+- Achievable with Vite's dynamic imports. Day-5 polish step: cross-check against budget with the default Vite bundle report (or `rollup-plugin-visualizer`).
+
+(see [[react-vite-bundle-size-budget]])
+
 ## What lives in IndexedDB
 
 Personal notes — including audio Blobs and image Blobs — never leave the browser unsanitized. The schema is documented in [[trellis-data-model]] and the [[two-layer-architecture]] enforces this boundary.
@@ -38,7 +50,7 @@ Personal notes — including audio Blobs and image Blobs — never leave the bro
 
 ## Open questions
 
-- Bundle-size budget — not specified. Affects time-to-interactive on the demo URL.
+- (none — bundle budget resolved; see [[react-vite-bundle-size-budget]])
 
 ## Sources
 

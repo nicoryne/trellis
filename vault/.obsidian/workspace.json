@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "templates/question.md",
+                "file": "entities/harvey.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "question"
+              "title": "harvey"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "templates/question.md",
+                "file": "entities/harvey.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for question"
+              "title": "Backlinks for harvey"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "templates/question.md",
+                "file": "entities/harvey.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from question"
+              "title": "Outgoing links from harvey"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "templates/question.md",
+                "file": "entities/harvey.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of question"
+              "title": "Outline of harvey"
             }
           }
         ]
@@ -185,19 +185,35 @@
   },
   "active": "b12e86c727303de6",
   "lastOpenFiles": [
-    "sources/trellis-context-dump.md.tmp.29852.d852a629639d",
-    "entities/trellis.md",
-    "topics/trellis-rejected-ideas.md",
-    "topics/trellis-decision-history.md",
-    "concepts/ethical-wall.md",
-    "concepts/adoption-strategy.md",
-    "entities/lablab.md",
-    "entities/rewind-ai.md",
-    "entities/veea.md",
-    "entities/lobster-trap.md",
-    "entities/stratum.md",
-    "sources/trellis-context-dump.md",
-    "raw/context-dump.md",
-    "log.md"
+    "topics/trellis-demo-narrative.md.tmp.29852.ea895fe6a147",
+    "concepts/attorney-client-privilege.md",
+    "questions/cytoscape-webgl-vs-canvas.md.tmp.29852.36ff40e94693",
+    "questions/demo-off-script-query-handling.md.tmp.29852.38309d93cef7",
+    "Untitled.canvas",
+    "questions/contradiction-flag-vs-silent-update.md",
+    "questions/index-only-retrieval-scale-limit.md",
+    "questions/multi-curator-vault-discipline.md",
+    "questions/v2-vertical-expansion-order.md",
+    "questions/channel-partner-strategy-for-sam-long-tail.md",
+    "questions/tam-adjacent-verticals-trajectory.md",
+    "questions/harvey-mcp-roadmap.md",
+    "questions/spellbook-privilege-posture.md",
+    "questions/glean-on-prem-comparison.md",
+    "questions/dms-ingest-volume-strategy.md",
+    "questions/imanage-v1-api-path.md",
+    "questions/acme-seed-voice-tone.md",
+    "questions/query-overlay-low-end-fallback.md",
+    "questions/voice-control-v1-scope.md",
+    "questions/light-theme-trigger.md",
+    "questions/lobster-trap-legal-policy-defaults.md",
+    "questions/lobster-trap-latency-cost-measurement.md",
+    "questions/lobster-trap-day-5-go-no-go.md",
+    "questions/lablab-judging-weights-demo-vs-video.md",
+    "questions/demo-off-script-query-handling.md",
+    "questions/performance-review-integration.md",
+    "questions/v1-seed-strategy-at-firm-onboarding.md",
+    "questions/departure-capture-mechanics.md",
+    "questions/buyer-at-firms-without-km-function.md",
+    "sources/trellis-context-dump.md.tmp.29852.d852a629639d"
   ]
 }

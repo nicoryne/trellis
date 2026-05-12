@@ -21,6 +21,9 @@ The single hard-coded demo firm in the [[trellis]] hackathon MVP. Has one practi
   - `lead@acme.law` / `demo` — role [[practice-group-lead|Practice Group Lead]]
   - `admin@acme.law` / `demo` — role [[knowledge-admin|Knowledge Admin]]
 - **Seed footprint**: 5–8 personal notes for the Lawyer; 15–30 published insights in the team graph spanning judge tendencies, opposing counsel, motion practice, expert witnesses, settlement, procedure.
+- **Seed content corpus**: **Philippine laws, articles, and previous cases** — so the team brain delivers useful answers from day one. (Matches [[adoption-strategy]] Pillar 2 — "pre-seeded with public legal knowledge.") (see [[demo-off-script-query-handling]])
+- **Seed voice**: **conclusory with brief narrative justification, 2–3 sentences each**, in the voice of a senior partner dictating a quick note. A one-line conclusion followed by 1–2 sentences of justification or context — enough to make the [[redaction-pipeline|side-by-side diff]] visibly do generalization work. (see [[acme-seed-voice-tone]])
+- **Backup query coverage**: seed designed so **2–3 additional queries beyond the canonical one** also produce strong cited answers, giving demo headroom for off-script judges. (see [[demo-off-script-query-handling]])
 
 ## Why it exists
 
@@ -33,7 +36,7 @@ Without a populated firm, the [[hero-moments|retrieval moment]] fails. The seede
 
 ## Open questions
 
-- What's the "voice" of the firm in seed insights — terse and conclusory, or narrative? Affects how generalization in [[redaction-pipeline]] reads on screen.
+- (none — seed voice and content corpus answered; see [[acme-seed-voice-tone]] and [[demo-off-script-query-handling]])
 
 ## Sources
 

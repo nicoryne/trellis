@@ -13,6 +13,10 @@ Tip: `grep "^## \[" log.md | head -5` yields the last 5 entries.
 
 ---
 
+## [2026-05-12] note | Answered 5 questions (first batch)
+
+Answered: [[acme-seed-voice-tone]], [[practice-group-lead-mvp-distinctiveness]], [[demo-off-script-query-handling]], [[cytoscape-webgl-vs-canvas]], [[react-vite-bundle-size-budget]]. Partially answered [[v1-seed-strategy-at-firm-onboarding]] for the MVP-demo scope (V1 customer-onboarding still open). Propagated to [[acme-litigation-partners]] (added seed corpus = PH laws/articles/cases, seed voice, backup-query coverage as key facts), [[practice-group-lead]] (replaced ⚠ demo-risk callout with the rehearsed talk-track), [[cytoscape-js]] (canvas renderer + lazy-load note), [[react-vite]] (full bundle-budget section), [[trellis-demo-narrative]] (new refusal segment + seed-corpus + backup-query design constraints). Index marked with ✓ and ◐ status indicators.
+
 ## [2026-05-12] ingest | Trellis Product Brief + Context Dump (business-model revision)
 
 Re-ingested `raw/product-brief.md` and `raw/context-dump.md`. Material change: **business model flipped from firm-wide license to practice-group license with land-and-expand**, and target customer reframed from "primary target" to **"wedge, not ceiling"** with an explicit expansion path (other practice groups → BigLaw → in-house legal → adjacent professional services). New pricing tiers: $25K/$50K/$85K for 10–25 / 25–50 / 50–100 litigators; ~$200K ARR per firm at maturity. The context dump adds **Phase 11** documenting the reasoning. Heavy rewrite of [[trellis-business-model]]; updates to [[trellis]], [[knowledge-admin]], [[trellis-v1-roadmap]] pricing tiers, [[trellis-decision-history]] (Phase 11 added), [[trellis-rejected-ideas]] (firm-wide license added to the list), and re-ingest notes on both source pages. Product, architecture, and demo are unchanged.

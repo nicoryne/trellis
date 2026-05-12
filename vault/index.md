@@ -106,4 +106,74 @@ Catalog of every page in the wiki. Updated on every ingest and every lint.
 
 ## Questions
 
-- (none yet — open as gaps are discovered during ingest or query)
+Status legend: **✓** answered · **◐** partially answered · *(no mark)* open. Once answered, the originating pages get updated to absorb the answer.
+
+### Architecture and infrastructure
+- [[embedding-model-migration-path]] — what if Gemini's embedding dimension changes?
+- [[firm-graph-scale-beyond-10k-nodes]] — V1 plan at 100k+ nodes per firm
+- [[per-firm-kms-aws-vs-gcp]] — pick one or per-firm choice
+- [[tauri-auto-update-and-signing]] — distribution/signing strategy
+- [[tauri-gemma-inference-bridge]] — webview↔inference path
+- ✓ [[cytoscape-webgl-vs-canvas]] — **canvas**
+- ✓ [[react-vite-bundle-size-budget]] — **500KB gzipped, <2s TTI, code-split chat/capture/graph, lazy Cytoscape & WaveSurfer**
+
+### AI pipelines
+- [[auto-organization-json-validation-fallback]] — Gemini structured-output failure path
+- [[on-device-speech-recognition-path]] — V1 audio (Whisper.cpp vs native)
+- [[gemma-quantization-and-throughput]] — on-device throughput target
+- [[gemma-fallback-on-old-hardware]] — degrade or block?
+- [[presidio-custom-legal-recognizers-training]] — V1 fine-tuned model provenance
+- [[insight-preservation-score-calibration]] — calibrating the 0–100 score
+
+### Privacy, privilege, ethical wall
+- [[ethical-wall-conflicts-db-source]] — which conflicts DB to inherit from
+- [[ethical-wall-retrieval-time-behavior]] — what happens when retrieval would cite a walled node
+- [[ethical-wall-denied-read-audit-logging]] — separate log channel?
+- [[cross-layer-search-privilege-handling]] — V1+ unified search
+
+### MCP and retrieval
+- [[mcp-client-readiness-harvey-cocounsel-copilot]] — first integration partner
+- [[mcp-developer-docs-surface]] — V1 docs platform
+- [[graph-augmented-rag-generalization]] — does graph augmentation pay off
+
+### Personas and adoption
+- ✓ [[practice-group-lead-mvp-distinctiveness]] — **same access as Lawyer in MVP + rehearsed talk-track; Lead dashboard ships in V1**
+- [[lead-flag-for-promotion-ui]] — V1 design surface
+- [[litigator-capture-frequency-target]] — target metric
+- [[knowledge-admin-dashboard-surfaces-v1]] — admin dashboard design
+- [[buyer-at-firms-without-km-function]] — substitute buyer
+- [[departure-capture-mechanics]] — offboarding flow design
+- ◐ [[v1-seed-strategy-at-firm-onboarding]] — **MVP: PH laws/articles/cases. V1 customer-onboarding still open.**
+- [[performance-review-integration]] — does it ever ship
+
+### Demo and hackathon
+- ✓ [[demo-off-script-query-handling]] — **rehearsed talk-track + 2–3 backup queries seeded + explicit refusal segment**
+- [[lablab-judging-weights-demo-vs-video]] — rubric weight
+- [[lobster-trap-day-5-go-no-go]] — integrate or skip
+- [[lobster-trap-latency-cost-measurement]] — measure first
+- [[lobster-trap-legal-policy-defaults]] — does it ship usable rules
+- ✓ [[acme-seed-voice-tone]] — **conclusory + brief narrative justification, 2–3 sentences each, senior-partner-dictating voice**
+
+### Design
+- [[light-theme-trigger]] — when does light mode ship
+- [[voice-control-v1-scope]] — first-class feature scope
+- [[query-overlay-low-end-fallback]] — beyond `prefers-reduced-motion`
+
+### Integrations
+- [[imanage-v1-api-path]] — REST vs MFAPI vs plugins
+- [[dms-ingest-volume-strategy]] — cost envelope at firm scale
+
+### Competitive watch
+- [[glean-on-prem-comparison]] — has Glean shipped on-prem?
+- [[spellbook-privilege-posture]] — privilege-friendly?
+- [[harvey-mcp-roadmap]] — published?
+
+### Business and roadmap
+- [[tam-adjacent-verticals-trajectory]] — timeline and capital
+- [[channel-partner-strategy-for-sam-long-tail]] — which partners
+- [[v2-vertical-expansion-order]] — practice areas first or in-house first
+
+### Vault meta
+- [[multi-curator-vault-discipline]] — scaling the wiki pattern
+- [[index-only-retrieval-scale-limit]] — when to install qmd
+- [[contradiction-flag-vs-silent-update]] — rule for ⚠ flags
