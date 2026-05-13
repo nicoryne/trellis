@@ -59,7 +59,7 @@ export default function PersonalGraphView() {
 
   useEffect(() => {
     loadNotes();
-  }, [loadNotes]);
+  }, []);
 
   useEffect(() => {
     const cy = cyRef.current;
