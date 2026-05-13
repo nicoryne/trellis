@@ -3,7 +3,6 @@ import WaveSurfer from 'wavesurfer.js';
 import { startRecording, formatDuration, MAX_RECORDING_DURATION, type Recording } from '../../lib/audio';
 import { transcribeAudio } from '../../api/client';
 import { useNoteStore } from '../../store/noteStore';
-import type { NoteClassification } from '../../types/index';
 
 // TODO: replace STUB_TOKEN with useAuthStore.getState().token once Gabe's authStore is wired
 const STUB_TOKEN = '';
@@ -36,6 +35,14 @@ export default function AudioCapture() {
     return () => { wavesurferRef.current?.destroy(); wavesurferRef.current = null; };
   }, [state]);
 
+  // Auto-stop when duration reaches the cap — kept outside the interval updater to avoid side effects in a state setter
+  useEffect(() => {
+    if (state === 'recording' && duration >= MAX_RECORDING_DURATION - 1) {
+      void handleStop();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleStop references stable refs only
+  }, [duration, state]);
+
   async function handleStart() {
     setError(null);
     setDuration(0);
@@ -43,13 +50,7 @@ export default function AudioCapture() {
       recordingRef.current = await startRecording();
       setState('recording');
       timerRef.current = setInterval(() => {
-        setDuration(prev => {
-          if (prev >= MAX_RECORDING_DURATION - 1) {
-            handleStop();
-            return prev;
-          }
-          return prev + 1;
-        });
+        setDuration(prev => prev + 1);
       }, 1000);
     } catch {
       setError('Microphone access denied. Allow microphone access in your browser and try again.');
@@ -66,12 +67,12 @@ export default function AudioCapture() {
     recordingRef.current = null;
 
     const response = await transcribeAudio(blob, STUB_TOKEN);
-    if (response.error) {
+    if (!response.data) {
       setError('Transcription failed. Try again.');
       setState('idle');
       return;
     }
-    setTranscript(response.data!.transcript);
+    setTranscript(response.data.transcript);
     setState('editing');
   }
 
@@ -83,7 +84,7 @@ export default function AudioCapture() {
       audioBlob: blobRef.current ?? undefined,
       audioTranscript: transcript,
       extractedEntities: [],
-      classification: 'observation' as NoteClassification,
+      classification: 'observation',
       isPrivileged: false,
       isPublished: false,
     });
