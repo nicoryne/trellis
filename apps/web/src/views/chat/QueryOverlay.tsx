@@ -20,6 +20,15 @@ const NODE_COLORS: Record<string, string> = {
 };
 
 /**
+ * Deterministic hash to produce stable "random" jitter per node index.
+ * Avoids Math.random() in the render loop which causes jitter every frame.
+ */
+function stableJitter(index: number, seed: number): number {
+  const x = Math.sin(index * 9301 + seed * 49297) * 49297;
+  return x - Math.floor(x); // 0..1
+}
+
+/**
  * QueryOverlay — Hero Moment 3 (design guidelines §8.3)
  *
  * Full-screen overlay that:
@@ -39,8 +48,8 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [graphData, setGraphData] = useState<any>(null);
-  const [phase, setPhase] = useState<'inactive' | 'fadein' | 'pulse' | 'hold' | 'fadeout'>('inactive');
   const [overlayOpacity, setOverlayOpacity] = useState(0);
+  const [visible, setVisible] = useState(false);
   const animationRef = useRef<number>(0);
   const prefersReducedMotion = useRef(
     typeof window !== 'undefined'
@@ -64,7 +73,7 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
     return () => window.removeEventListener('keydown', handleKey);
   }, [active, onDismiss]);
 
-  // Main animation loop
+  // Main animation loop — draws the graph onto the canvas
   const animate = useCallback(() => {
     if (!canvasRef.current || !graphData) return;
 
@@ -72,23 +81,25 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas to full window
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    // Set canvas to full window (device pixel ratio for sharpness)
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    ctx.scale(dpr, dpr);
 
     const nodes = graphData.nodes || [];
     const edges = graphData.edges || [];
 
-    // Position nodes in a force-directed-ish layout (simplified circle layout)
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const radius = Math.min(canvas.width, canvas.height) * 0.35;
+    // Position nodes with deterministic jitter (stable across frames)
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+    const radius = Math.min(window.innerWidth, window.innerHeight) * 0.35;
 
     const nodePositions = new Map<string, { x: number; y: number }>();
     nodes.forEach((node: any, i: number) => {
       const angle = (2 * Math.PI * i) / nodes.length;
-      // Add some jitter for organic feel
-      const r = radius * (0.7 + Math.random() * 0.6);
+      const jitter = stableJitter(i, 42);
+      const r = radius * (0.7 + jitter * 0.6);
       nodePositions.set(node.id, {
         x: centerX + r * Math.cos(angle),
         y: centerY + r * Math.sin(angle),
@@ -96,7 +107,7 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
     });
 
     // Clear
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
     // Draw edges
     for (const edge of edges) {
@@ -147,80 +158,59 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
     }
   }, [graphData, citedNodeIds, overlayOpacity]);
 
-  // Phase management
+  // Fade-in / fade-out animation driven by `active` prop
   useEffect(() => {
     if (active && graphData) {
+      setVisible(true);
+
       if (prefersReducedMotion.current) {
-        // Skip animation, show final state briefly
         setOverlayOpacity(1);
-        setPhase('hold');
-        const timeout = setTimeout(() => {
-          setOverlayOpacity(0);
-          setPhase('inactive');
-        }, 800);
+        const timeout = setTimeout(() => setOverlayOpacity(1), 800);
         return () => clearTimeout(timeout);
       }
 
-      // Start fade-in
-      setPhase('fadein');
-      let start = performance.now();
-
-      const runAnimation = (now: number) => {
-        const elapsed = now - start;
-
-        if (phase === 'fadein' || elapsed < 400) {
-          // Fade in over 400ms
-          setOverlayOpacity(Math.min(elapsed / 400, 1));
-          if (elapsed >= 400) {
-            setPhase('pulse');
-            start = now;
-          }
-        } else if (phase === 'pulse' || elapsed < 400 + citedNodeIds.length * 150 + 300) {
-          // Pulse phase — nodes are already highlighted by citedNodeIds
-          setOverlayOpacity(1);
-          const pulseElapsed = elapsed - 400;
-          if (pulseElapsed >= citedNodeIds.length * 150 + 300) {
-            setPhase('hold');
-            start = now;
-          }
-        }
-
-        animationRef.current = requestAnimationFrame(runAnimation);
-      };
-
-      animationRef.current = requestAnimationFrame(runAnimation);
-
-      return () => cancelAnimationFrame(animationRef.current);
-    } else if (!active && phase !== 'inactive') {
-      // Fade out over 600ms
-      setPhase('fadeout');
+      // Fade in over 400ms using rAF
       const start = performance.now();
-
-      const fadeOut = (now: number) => {
-        const elapsed = now - start;
-        const progress = Math.min(elapsed / 600, 1);
-        setOverlayOpacity(1 - progress);
-
-        if (progress >= 1) {
-          setPhase('inactive');
-          return;
+      const fadeIn = (now: number) => {
+        const progress = Math.min((now - start) / 400, 1);
+        setOverlayOpacity(progress);
+        if (progress < 1) {
+          animationRef.current = requestAnimationFrame(fadeIn);
         }
-        animationRef.current = requestAnimationFrame(fadeOut);
       };
+      animationRef.current = requestAnimationFrame(fadeIn);
+      return () => cancelAnimationFrame(animationRef.current);
+    } else if (!active && visible) {
+      if (prefersReducedMotion.current) {
+        setOverlayOpacity(0);
+        setVisible(false);
+        return;
+      }
 
+      // Fade out over 600ms
+      const start = performance.now();
+      const fadeOut = (now: number) => {
+        const progress = Math.min((now - start) / 600, 1);
+        setOverlayOpacity(1 - progress);
+        if (progress < 1) {
+          animationRef.current = requestAnimationFrame(fadeOut);
+        } else {
+          setVisible(false);
+        }
+      };
       animationRef.current = requestAnimationFrame(fadeOut);
       return () => cancelAnimationFrame(animationRef.current);
     }
-  }, [active, graphData, citedNodeIds.length]);
+  }, [active, graphData, visible]);
 
-  // Render loop
+  // Re-draw canvas whenever opacity or data changes
   useEffect(() => {
-    if (phase !== 'inactive') {
+    if (visible) {
       animate();
     }
-  }, [phase, overlayOpacity, animate]);
+  }, [visible, overlayOpacity, animate]);
 
-  if (phase === 'inactive' && !active) return null;
+  if (!visible) return null;
 
   return (
     <div
@@ -233,7 +223,6 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        transition: prefersReducedMotion.current ? 'none' : undefined,
       }}
       onClick={onDismiss}
     >

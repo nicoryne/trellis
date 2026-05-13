@@ -62,30 +62,27 @@ export const useChatStore = create<ChatState>((set) => ({
   },
 
   appendToken: (_messageId: string, text: string) => {
-    set((state) => {
-      const messages = [...state.messages];
-      const lastAssistant = messages.findLast((m) => m.role === 'assistant');
-      if (lastAssistant) {
-        lastAssistant.content += text;
-      }
-      return { messages };
-    });
+    set((state) => ({
+      messages: state.messages.map((m, i) => {
+        if (i === state.messages.length - 1 && m.role === 'assistant') {
+          return { ...m, content: m.content + text };
+        }
+        return m;
+      }),
+    }));
   },
 
   finishStreaming: (_messageId: string, confidence: ConfidenceLevel, sourceCount: number) => {
-    set((state) => {
-      const messages = [...state.messages];
-      const lastAssistant = messages.findLast((m) => m.role === 'assistant');
-      if (lastAssistant) {
-        lastAssistant.confidence = confidence;
-        lastAssistant.sourceCount = sourceCount;
-      }
-      return {
-        messages,
-        isStreaming: false,
-        overlayActive: false,
-      };
-    });
+    set((state) => ({
+      messages: state.messages.map((m, i) => {
+        if (i === state.messages.length - 1 && m.role === 'assistant') {
+          return { ...m, confidence, sourceCount };
+        }
+        return m;
+      }),
+      isStreaming: false,
+      overlayActive: false,
+    }));
   },
 
   setOverlayActive: (active: boolean) => set({ overlayActive: active }),
