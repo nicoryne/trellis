@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 // fake-indexeddb polyfills IndexedDB via vitest setup file
+import { _resetDB } from '../../lib/idb';
 import { useNoteStore } from '../../store/noteStore';
 import type { OrganizeResponse } from '../../types/index';
 
 beforeEach(() => {
+  _resetDB();
   // Reset Zustand store state between tests
   useNoteStore.setState({ notes: [], activeNoteId: null });
 });
