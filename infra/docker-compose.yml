@@ -1,0 +1,39 @@
+# Trellis Local Development Stack
+# Run: docker compose up -d
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: trellis-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: trellis
+      POSTGRES_USER: trellis
+      POSTGRES_PASSWORD: trellis_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../apps/api/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trellis"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  presidio-analyzer:
+    image: mcr.microsoft.com/presidio-analyzer:latest
+    container_name: trellis-presidio-analyzer
+    restart: unless-stopped
+    ports:
+      - "5001:3000"
+
+  presidio-anonymizer:
+    image: mcr.microsoft.com/presidio-anonymizer:latest
+    container_name: trellis-presidio-anonymizer
+    restart: unless-stopped
+    ports:
+      - "5002:3000"
+
+volumes:
+  pgdata:

@@ -66,4 +66,52 @@ export interface ApiResponse<T> {
 // (Gabe appends here)
 
 // ─── Nicolo: Retrieval & Chat ─────────────────────────────────────────────────
-// (Nicolo appends here)
+
+export interface TeamGraphNode {
+  id: string;
+  nodeType: 'insight' | 'matter' | 'party' | 'lawyer' | 'judge'
+    | 'witness' | 'concept' | 'precedent' | 'statute';
+  title: string;
+  body?: string;
+  summary?: string;
+  contributorId?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeamGraphEdge {
+  id: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+  edgeType: 'mentions' | 'involves' | 'cites' | 'authored_by'
+    | 'about' | 'concerns' | 'related_to';
+  weight: number;
+}
+
+export interface TeamGraph {
+  nodes: TeamGraphNode[];
+  edges: TeamGraphEdge[];
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  citations?: Citation[];
+  confidence?: ConfidenceLevel;
+  sourceCount?: number;
+  citedNodeIds?: string[];
+  timestamp: number;
+}
+
+export interface Citation {
+  index: number;
+  nodeId: string;
+  title: string;
+  summary?: string;
+  nodeType: TeamGraphNode['nodeType'];
+}
+
+export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'refuse';
+

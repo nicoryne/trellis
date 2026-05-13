@@ -1,0 +1,63 @@
+/* Trellis Chat Animations — Nicolo's domain */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes pulseNode {
+  0% { transform: scale(1); opacity: 0.15; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; backdrop-filter: blur(0px); }
+  to { opacity: 1; backdrop-filter: blur(8px); }
+}
+
+@keyframes overlayFadeOut {
+  from { opacity: 1; backdrop-filter: blur(8px); }
+  to { opacity: 0; backdrop-filter: blur(0px); }
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes fadeIn {
+    from { opacity: 1; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideInRight {
+    from { transform: translateX(0); }
+    to { transform: translateX(0); }
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+  }
+
+  @keyframes pulseNode {
+    0%, 100% { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes overlayFadeIn {
+    from { opacity: 1; }
+    to { opacity: 1; }
+  }
+
+  @keyframes overlayFadeOut {
+    from { opacity: 0; }
+    to { opacity: 0; }
+  }
+}

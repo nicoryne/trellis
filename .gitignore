@@ -2,3 +2,17 @@
 .agents
 skills-lock.json
 docs/superpowers
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
