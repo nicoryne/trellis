@@ -3,9 +3,9 @@ title: Auto-organization pipeline
 type: concept
 status: active
 tags: [pipeline, ai, trellis, extraction]
-sources: [trellis-product-requirements, trellis-project-architecture]
+sources: [trellis-product-requirements, trellis-project-architecture, trellis-implementation-plan]
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-13
 ---
 
 # Auto-organization pipeline
@@ -14,20 +14,40 @@ After any personal note is saved, [[trellis|Trellis]] runs the auto-organization
 
 ## Pipeline steps (single Gemini call returns all of this)
 
-1. **Entity extraction** — identify named entities relevant to legal context:
-   - Matters (case names, matter numbers)
-   - Parties (clients, opposing parties)
-   - Lawyers (firm lawyers, opposing counsel, judges)
-   - Witnesses (expert and fact)
-   - Legal concepts (claims, defenses, motion types, doctrines)
-   - Statutes and precedents (with citation parsing)
+1. **Entity extraction** — identify named entities relevant to legal context. Eight exact types:
 
-2. **Classification** — categorize the note by type:
-   - `strategy` | `observation` | `lesson_learned` | `action_item` | `research` | `meeting_summary`
+   | Type | When to use |
+   |---|---|
+   | `matter` | A case, lawsuit, or legal matter |
+   | `party` | A client, opposing party, corporation, or individual involved in a matter |
+   | `lawyer` | A specific attorney (firm lawyer or opposing counsel) |
+   | `judge` | A specific judge or magistrate |
+   | `witness` | An expert witness, fact witness, or deponent |
+   | `concept` | A legal concept, doctrine, or legal principle |
+   | `precedent` | A cited case or legal authority |
+   | `statute` | A statute, regulation, or rule |
 
-3. **Privilege flagging** — detect privileged content patterns and tag the note as `isPrivileged: true` if triggered. This governs the [[redaction-pipeline]] later during publish.
+2. **Classification** — categorize the note by type (pick exactly one):
+   - `strategy` — tactical or strategic decisions, approach notes
+   - `observation` — observations about courts, judges, opposing counsel, proceedings
+   - `lesson_learned` — post-matter retrospectives, what worked or did not work
+   - `action_item` — tasks, follow-ups, deadlines
+   - `research` — legal research findings, doctrine summaries
+   - `meeting_summary` — notes from meetings, calls, or conferences
 
-4. **Graph integration** (post-call, frontend) — create or update nodes for extracted entities in the personal graph; create edges from the note node to entity nodes; suggest edges to existing notes that share entities.
+3. **Privilege flagging** — detect privileged content. Set `isPrivileged: true` if the note contains: direct attorney-client communications; work product (mental impressions, legal theories, litigation strategy); settlement discussions or negotiation positions; or internal case assessments or risk evaluations. **Conservative threshold: when in doubt, flag as privileged.** False positives are far preferable to false negatives in a law firm context. This governs the [[redaction-pipeline]] later during publish.
+
+4. **Graph integration** (post-call, frontend) — create or update nodes for extracted entities in the personal graph; create edges from the note node to entity nodes.
+
+## Implementation (as shipped — `apps/api/src/services/organize.ts`)
+
+- **Model**: `gemini-2.5-pro`
+- **SDK**: `@google/generative-ai` with `responseMimeType: 'application/json'` + typed `responseSchema`
+- **System prompt**: `apps/api/src/prompts/organize.md`
+- **Confidence threshold**: entities below **0.5** confidence are excluded
+- **Max entities per note**: 0–10; do not force-extract if entities are not clearly present
+- **Normalization**: canonical entity names (`"Judge Cruz"`, not `"the judge"`)
+- **Route**: `POST /api/organize` — accepts note content (string), returns `{ entities, classification, isPrivileged }`; requires valid JWT
 
 ## Acceptance criteria (per [[trellis-product-requirements]] §2.3)
 
@@ -40,8 +60,8 @@ After any personal note is saved, [[trellis|Trellis]] runs the auto-organization
 ## Edge cases
 
 - **Extraction failure (API error)**: note is saved without enrichment; a retry button is visible.
-- **Duplicate entities** (same name, different casing): merged at the graph level.
-- **Low-confidence entities** (below 0.6): suggested but not auto-added.
+- **Duplicate entities** (same type + name): deduplicated by `type:name` key in `graphUtils.ts`.
+- **Low-confidence entities** (below 0.5): excluded entirely (not suggested).
 
 ## Why a single call
 
@@ -55,9 +75,10 @@ After any personal note is saved, [[trellis|Trellis]] runs the auto-organization
 
 ## Open questions
 
-- Schema validation reliability of structured outputs across Gemini versions — fallback path when JSON validation fails.
+- Schema validation reliability of structured outputs across Gemini versions — fallback path when JSON validation fails. (see [[auto-organization-json-validation-fallback]])
 
 ## Sources
 
 - [[trellis-product-requirements]]
 - [[trellis-project-architecture]]
+- [[trellis-implementation-plan]]

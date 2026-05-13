@@ -95,6 +95,8 @@ Personal notes live in **browser IndexedDB** only.
 
 ## Cross-references
 
+- [[trellis-codebase-structure]] — monorepo layout, directory ownership per developer
+- [[trellis-implementation-plan]] — ticket-to-file mapping and build schedule
 - [[trellis-data-model]] — schemas in detail
 - [[trellis-ai-pipelines]] — sequence diagrams
 - [[trellis-api-surface]] — REST endpoints

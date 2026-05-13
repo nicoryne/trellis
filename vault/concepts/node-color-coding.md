@@ -36,10 +36,13 @@ The palette assigned to each node type in [[trellis|Trellis]]'s graph views. Gov
 
 If a user sees gold in the graph, they should know it means *"this is part of the answer being cited right now."* Not *"this is a node type."* That separation is what makes the [[query-overlay-animation]] readable without legend.
 
-## Implementation hook
+## Implementation
 
-Tokens are pre-defined in `tokens.css` ([[trellis-design-guidelines]] §13) as `--node-insight`, `--node-matter`, etc., for direct use in [[cytoscape-js]] style sheets.
+Palette is implemented in `apps/web/src/lib/graphUtils.ts` as `NODE_COLORS` (a `Record<string, string>`). The hex values match [[trellis-design-guidelines]] §2.5 exactly. Edge defaults are also defined there: `EDGE_COLOR_DEFAULT = '#30363d'`, `EDGE_COLOR_HOVER = '#7d8590'`. Tokens are also pre-defined in `tokens.css` as `--node-insight`, `--node-matter`, etc., for direct use in [[cytoscape-js]] style sheets.
+
+Note: `judge` uses `#073b4c` (deep slate) and is rendered **with a white outline** in the graph to maintain legibility against dark backgrounds.
 
 ## Sources
 
 - [[trellis-design-guidelines]]
+- [[trellis-implementation-plan]]
