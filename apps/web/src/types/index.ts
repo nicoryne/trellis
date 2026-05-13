@@ -63,7 +63,37 @@ export interface ApiResponse<T> {
 }
 
 // ─── Gabe: Auth & Governance ─────────────────────────────────────────────────
-// (Gabe appends here)
+
+export interface User {
+  id: string;
+  email: string;
+  displayName: string;
+  role: 'lawyer' | 'practice_group_lead' | 'knowledge_admin';
+}
+
+export interface LoginResponse {
+  token: string;
+  user: User;
+}
+
+export interface RedactionItem {
+  original: string;
+  replacement: string;
+  type: 'PII' | 'GENERALIZATION';
+  position: [number, number];
+}
+
+export interface RedactResponse {
+  original: string;
+  sanitized: string;
+  redactions: RedactionItem[];
+  confidence: number;
+}
+
+export interface PublishResponse {
+  nodeId: string;
+  message: string;
+}
 
 // ─── Nicolo: Retrieval & Chat ─────────────────────────────────────────────────
 
