@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock the Gemini SDK before importing the service
 vi.mock('@google/generative-ai', () => ({

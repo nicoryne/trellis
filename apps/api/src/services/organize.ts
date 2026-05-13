@@ -59,5 +59,10 @@ const model = genAI.getGenerativeModel({
 
 export async function organizeNote(content: string): Promise<OrganizeResult> {
   const result = await model.generateContent(content);
-  return JSON.parse(result.response.text()) as OrganizeResult;
+  const text = result.response.text();
+  try {
+    return JSON.parse(text) as OrganizeResult;
+  } catch {
+    throw new Error(`Gemini returned non-JSON response: ${text.slice(0, 100)}`);
+  }
 }
