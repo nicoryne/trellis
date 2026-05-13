@@ -1,18 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 // fake-indexeddb via vitest setup
 import { seedPersonalNotes } from '../../lib/seedPersonal';
-import { getAllNotes, createNote } from '../../lib/idb';
+import { getAllNotes, createNote, _resetDB } from '../../lib/idb';
 
 beforeEach(async () => {
-  // Clear notes before each test by re-opening fresh DB is handled by fake-indexeddb
+  _resetDB();
 });
 
 describe('seedPersonalNotes', () => {
   it('creates notes when IndexedDB is empty', async () => {
     await seedPersonalNotes();
     const notes = await getAllNotes();
-    expect(notes.length).toBeGreaterThanOrEqual(5);
-    expect(notes.length).toBeLessThanOrEqual(8);
+    expect(notes).toHaveLength(6);
   });
 
   it('is idempotent — does not re-seed if notes exist', async () => {
