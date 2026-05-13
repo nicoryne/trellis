@@ -1,10 +1,9 @@
-// TODO: apply auth middleware — add `auth` from middleware/auth.ts to each route once Gabe's file is in place.
-// Example: router.post('/organize', auth, async (req, res) => { ... })
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { auth } from '../middleware/auth';
 import { organizeNote } from '../services/organize';
 
 const router = Router();
@@ -19,7 +18,7 @@ const organizeSchema = z.object({
   content: z.string().min(1).max(50_000),
 });
 
-router.post('/organize', async (req: Request, res: Response) => {
+router.post('/organize', auth, async (req: Request, res: Response) => {
   const parsed = organizeSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -36,7 +35,7 @@ router.post('/organize', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/transcribe', upload.single('audio'), async (req: Request, res: Response) => {
+router.post('/transcribe', upload.single('audio'), auth, async (req: Request, res: Response) => {
   if (!req.file) {
     return res.status(400).json({
       error: { code: 'VALIDATION_ERROR', message: 'No audio file provided', retryable: false },
@@ -55,7 +54,7 @@ router.post('/transcribe', upload.single('audio'), async (req: Request, res: Res
   }
 });
 
-router.post('/vision', upload.single('image'), async (req: Request, res: Response) => {
+router.post('/vision', upload.single('image'), auth, async (req: Request, res: Response) => {
   if (!req.file) {
     return res.status(400).json({
       error: { code: 'VALIDATION_ERROR', message: 'No image file provided', retryable: false },
