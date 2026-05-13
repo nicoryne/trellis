@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send } from 'lucide-react';
 import { useChatStore } from '../../store/chatStore';
+import { useAuthStore } from '../../store/authStore';
 import { streamChat } from '../../api/chat';
 import { ChatMessageComponent } from './ChatMessage';
 import { NodeSummaryPanel } from './NodeSummaryPanel';
@@ -24,6 +25,7 @@ export const ChatView: React.FC = () => {
   const [sourcesExpanded, setSourcesExpanded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const token = useAuthStore((s) => s.token);
 
   const {
     messages,
@@ -54,9 +56,6 @@ export const ChatView: React.FC = () => {
     setInput('');
     addUserMessage(query);
 
-    // TODO: get token from authStore once Gabe wires it
-    const token: string | null = null;
-
     try {
       await streamChat(query, token, {
         onCitedNodes: (nodeIds, confidence) => {
@@ -79,7 +78,7 @@ export const ChatView: React.FC = () => {
       console.error('[chat] Failed to send query:', err);
       finishStreaming('', 'refuse', 0);
     }
-  }, [input, isStreaming, addUserMessage, startStreaming, appendToken, finishStreaming]);
+  }, [input, isStreaming, token, addUserMessage, startStreaming, appendToken, finishStreaming]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

@@ -3,6 +3,7 @@ import React, { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginRequest } from '../../api/auth';
 import { useAuthStore } from '../../store/authStore';
+import { seedPersonalNotes } from '../../lib/seedPersonal';
 import './login.css';
 
 export function LoginView() {
@@ -30,6 +31,13 @@ export function LoginView() {
 
     if (result.data) {
       login(result.data.token, result.data.user);
+
+      // Seed personal notes for the Lawyer demo account on first login (PRD §2.8)
+      // seedPersonalNotes() is idempotent — skips if notes already exist
+      if (result.data.user.role === 'lawyer') {
+        seedPersonalNotes().catch(console.error);
+      }
+
       navigate('/capture', { replace: true });
     }
   }

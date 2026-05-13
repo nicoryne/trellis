@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNoteStore } from '../../store/noteStore';
+import { useAuthStore } from '../../store/authStore';
 import { organizeNote } from '../../api/client';
+import { RedactionModal } from '../publish/RedactionModal';
 import type { NoteClassification } from '../../types/index';
-
-// TODO: replace STUB_TOKEN with useAuthStore.getState().token once Gabe's authStore is wired
-const STUB_TOKEN = '';
 
 const ENTITY_COLORS: Record<string, string> = {
   matter: '#06d6a0',
@@ -22,7 +21,9 @@ export default function TextCapture() {
   const [body, setBody] = useState('');
   const [isOrganizing, setIsOrganizing] = useState(false);
   const [organizeError, setOrganizeError] = useState<string | null>(null);
+  const [showRedaction, setShowRedaction] = useState(false);
   const { saveNote, setActiveNote, updateNoteOrganization, notes, activeNoteId } = useNoteStore();
+  const token = useAuthStore((s) => s.token);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noteIdRef = useRef<string | null>(null);
 
@@ -47,7 +48,7 @@ export default function TextCapture() {
     if (currentBody.trim().length > 20) {
       setIsOrganizing(true);
       setOrganizeError(null);
-      const response = await organizeNote(currentBody, STUB_TOKEN);
+      const response = await organizeNote(currentBody, token ?? '');
       setIsOrganizing(false);
       if (response.data) {
         await updateNoteOrganization(note.id, response.data);
@@ -120,6 +121,23 @@ export default function TextCapture() {
         </div>
       )}
 
+      {/* Publish to team graph button — visible when note is saved and not already published */}
+      {activeNote && !activeNote.isPublished && activeNote.body.trim().length > 0 && (
+        <button
+          onClick={() => setShowRedaction(true)}
+          className="px-4 py-2 rounded text-sm font-medium self-start"
+          style={{ backgroundColor: 'var(--accent-primary)', color: '#0d1117' }}
+        >
+          Publish to team graph
+        </button>
+      )}
+
+      {activeNote?.isPublished && (
+        <span className="text-xs px-3 py-1.5 rounded" style={{ backgroundColor: 'rgba(63,185,80,0.1)', color: 'var(--success)' }}>
+          Published
+        </span>
+      )}
+
       {isOrganizing && (
         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
           Organizing...
@@ -139,6 +157,20 @@ export default function TextCapture() {
             Retry
           </button>
         </div>
+      )}
+
+      {/* Redaction modal */}
+      {showRedaction && activeNote && (
+        <RedactionModal
+          note={activeNote}
+          onClose={() => setShowRedaction(false)}
+          onPublished={(nodeId) => {
+            // Mark the local note as published
+            import('../../lib/idb').then(({ updateNote }) => {
+              updateNote(activeNote.id, { isPublished: true, publishedNodeId: nodeId });
+            });
+          }}
+        />
       )}
     </div>
   );

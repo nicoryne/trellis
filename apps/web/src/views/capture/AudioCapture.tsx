@@ -3,9 +3,7 @@ import WaveSurfer from 'wavesurfer.js';
 import { startRecording, formatDuration, MAX_RECORDING_DURATION, type Recording } from '../../lib/audio';
 import { transcribeAudio } from '../../api/client';
 import { useNoteStore } from '../../store/noteStore';
-
-// TODO: replace STUB_TOKEN with useAuthStore.getState().token once Gabe's authStore is wired
-const STUB_TOKEN = '';
+import { useAuthStore } from '../../store/authStore';
 
 type AudioState = 'idle' | 'recording' | 'transcribing' | 'editing';
 
@@ -20,6 +18,7 @@ export default function AudioCapture() {
   const waveContainerRef = useRef<HTMLDivElement>(null);
   const blobRef = useRef<Blob | null>(null);
   const { saveNote } = useNoteStore();
+  const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
     if (state !== 'recording' || !waveContainerRef.current) return;
@@ -66,7 +65,7 @@ export default function AudioCapture() {
     blobRef.current = blob;
     recordingRef.current = null;
 
-    const response = await transcribeAudio(blob, STUB_TOKEN);
+    const response = await transcribeAudio(blob, token ?? '');
     if (!response.data) {
       setError('Transcription failed. Try again.');
       setState('idle');

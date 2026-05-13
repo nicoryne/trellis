@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { analyzeImage } from '../../api/client';
 import { useNoteStore } from '../../store/noteStore';
-
-// TODO: replace STUB_TOKEN with useAuthStore.getState().token once Gabe's authStore is wired
-const STUB_TOKEN = '';
+import { useAuthStore } from '../../store/authStore';
 
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -18,6 +16,7 @@ export default function ImageCapture() {
   const fileRef = useRef<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { saveNote } = useNoteStore();
+  const token = useAuthStore((s) => s.token);
 
   // Fix 1A + Fix 2: Revoke object URL when preview changes or on unmount
   useEffect(() => {
@@ -44,7 +43,7 @@ export default function ImageCapture() {
 
   async function runAnalysis(f: File) {
     setState('analyzing');
-    const response = await analyzeImage(f, STUB_TOKEN);
+    const response = await analyzeImage(f, token ?? '');
     // Fix 3: Stale request guard — bail if a newer upload has taken over
     if (fileRef.current !== f) return;
     // Fix 4: Replace unsafe non-null assertion with data check
