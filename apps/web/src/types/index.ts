@@ -31,7 +31,9 @@ export interface PersonalNote {
   title: string;
   body: string;
   contentType: 'text' | 'audio' | 'image';
+  /** Stored via IDB structured clone — reconstruct with new Blob([arrayBuffer]) if retrieved as empty after a page reload. */
   audioBlob?: Blob;
+  /** Stored via IDB structured clone — reconstruct with new Blob([arrayBuffer]) if retrieved as empty after a page reload. */
   imageBlob?: Blob;
   audioTranscript?: string;
   extractedEntities: Entity[];
