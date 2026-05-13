@@ -50,7 +50,7 @@ async function presidioRedact(text: string): Promise<{ tokenized: string; redact
     });
 
     if (!analyzeRes.ok) throw new Error('Presidio analyzer failed');
-    const analyzerResults: PresidioResult[] = await analyzeRes.json();
+    const analyzerResults: PresidioResult[] = await analyzeRes.json() as PresidioResult[];
 
     const anonymizeRes = await fetch(`${PRESIDIO_ANONYMIZER}/anonymize`, {
       method: 'POST',
@@ -63,7 +63,7 @@ async function presidioRedact(text: string): Promise<{ tokenized: string; redact
     });
 
     if (!anonymizeRes.ok) throw new Error('Presidio anonymizer failed');
-    const anonData: { text: string; items: Array<{ text: string; start: number; end: number; entity_type: string; operator: string }> } = await anonymizeRes.json();
+    const anonData = await anonymizeRes.json() as { text: string; items: Array<{ text: string; start: number; end: number; entity_type: string; operator: string }> };
 
     // Build redaction map from Presidio results
     const redactions: RedactionItem[] = analyzerResults.map((r) => ({

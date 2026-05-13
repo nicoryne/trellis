@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -26,7 +26,7 @@ const systemPrompt = readFileSync(
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-const responseSchema = {
+const responseSchema: Schema = {
   type: SchemaType.OBJECT,
   properties: {
     entities: {

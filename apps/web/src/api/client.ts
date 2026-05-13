@@ -2,9 +2,7 @@
 // For now, callers pass the token explicitly. Swap to: const token = useAuthStore.getState().token
 import type { ApiResponse, OrganizeResponse } from '../types/index';
 
-const BASE_URL = typeof import.meta !== 'undefined'
-  ? (import.meta.env?.VITE_API_URL ?? 'http://localhost:3000')
-  : 'http://localhost:3000';
+const BASE_URL = import.meta.env?.VITE_API_URL ?? '';
 
 async function apiRequest<T>(
   path: string,

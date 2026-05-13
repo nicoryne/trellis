@@ -43,7 +43,7 @@ router.post('/transcribe', upload.single('audio'), auth, async (req: Request, re
   }
   try {
     const transcription = await openai.audio.transcriptions.create({
-      file: new File([req.file.buffer], req.file.originalname, { type: req.file.mimetype }),
+      file: new File([new Uint8Array(req.file.buffer)], req.file.originalname, { type: req.file.mimetype }),
       model: 'whisper-1',
     });
     return res.json({ data: { transcript: transcription.text } });

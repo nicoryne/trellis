@@ -30,7 +30,7 @@ router.get('/', auth, async (_req: Request, res: Response) => {
  */
 router.get('/nodes/:id', auth, async (req: Request, res: Response) => {
   try {
-    const node = await getNodeById(req.params.id);
+    const node = await getNodeById(String(req.params.id));
     if (!node) {
       return res.status(404).json({
         error: {
