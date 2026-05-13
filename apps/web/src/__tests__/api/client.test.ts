@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { organizeNote, transcribeAudio, analyzeImage } from '../../api/client';
 
 const mockFetch = vi.fn();
@@ -60,5 +60,16 @@ describe('organizeNote', () => {
     const res = await organizeNote('content', 'token');
     expect(res.error?.code).toBe('NETWORK_ERROR');
     expect(res.error?.retryable).toBe(true);
+  });
+});
+
+describe('transcribeAudio', () => {
+  it('does not set Content-Type header (browser sets multipart boundary)', async () => {
+    mockOk({ transcript: 'hello' });
+    await transcribeAudio(new Blob(['audio'], { type: 'audio/webm' }), 'token');
+    const [, options] = mockFetch.mock.calls[0];
+    const headers = options.headers as Record<string, string>;
+    expect(headers['Content-Type']).toBeUndefined();
+    expect(headers['Authorization']).toBe('Bearer token');
   });
 });
