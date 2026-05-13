@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { Layout } from './components/Layout';
 import { LoginView } from './views/auth/LoginView';
+import { ToastContainer } from './components/Toast';
 
 const CaptureView = lazy(() => import('./views/capture/CaptureView').then((m) => ({ default: m.CaptureView })));
 const PersonalGraphView = lazy(() => import('./views/graph/PersonalGraphView').then((m) => ({ default: m.PersonalGraphView })));
@@ -37,6 +38,7 @@ export function App() {
           <Route path="*" element={<Navigate to="/capture" replace />} />
         </Routes>
       </Suspense>
+      <ToastContainer />
     </BrowserRouter>
   );
 }
