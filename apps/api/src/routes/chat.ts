@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import { auth } from '../middleware/auth';
 import { retrieveContext, streamRagResponse } from '../services/rag';
 
 const router = Router();
@@ -17,7 +18,7 @@ const chatSchema = z.object({
  *   event: token         → { text: string }
  *   event: done          → { confidence: string, sourceCount: number }
  */
-router.post('/chat', async (req: Request, res: Response) => {
+router.post('/chat', auth, async (req: Request, res: Response) => {
   const parsed = chatSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({

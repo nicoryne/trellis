@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { auth } from '../middleware/auth';
 import { getFullTeamGraph, getNodeById } from '../db/queries';
 
 const router = Router();
@@ -7,7 +8,7 @@ const router = Router();
  * GET /api/team-graph
  * Return all team graph nodes and edges for rendering.
  */
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', auth, async (_req: Request, res: Response) => {
   try {
     const graph = await getFullTeamGraph();
     return res.json({ data: graph });
@@ -27,7 +28,7 @@ router.get('/', async (_req: Request, res: Response) => {
  * GET /api/team-graph/nodes/:id
  * Return a single node with its connections (for citation summary panels).
  */
-router.get('/nodes/:id', async (req: Request, res: Response) => {
+router.get('/nodes/:id', auth, async (req: Request, res: Response) => {
   try {
     const node = await getNodeById(req.params.id);
     if (!node) {
