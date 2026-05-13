@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CytoscapeComponent from 'react-cytoscapejs';
 import type Cytoscape from 'cytoscape';
 import { useNoteStore } from '../../store/noteStore';
@@ -59,6 +59,7 @@ export default function PersonalGraphView() {
 
   useEffect(() => {
     loadNotes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadNotes is a stable Zustand action, intentionally run once on mount
   }, []);
 
   useEffect(() => {
@@ -75,7 +76,7 @@ export default function PersonalGraphView() {
     cy.edges().style({ opacity: 0.15 });
   }, [search]);
 
-  const elements = notesToCytoscapeElements(notes);
+  const elements = useMemo(() => notesToCytoscapeElements(notes), [notes]);
 
   if (notes.length === 0) {
     return (
@@ -119,6 +120,7 @@ export default function PersonalGraphView() {
           stylesheet={CYTOSCAPE_STYLE}
           style={{ width: '100%', height: '100%' }}
           cy={cy => {
+            if (cyRef.current === cy) return;
             cyRef.current = cy;
 
             cy.on('tap', 'node', evt => {
