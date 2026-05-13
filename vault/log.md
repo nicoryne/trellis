@@ -2,7 +2,7 @@
 title: Log
 type: log
 status: active
-updated: 2026-05-12
+updated: 2026-05-13
 ---
 
 # Log
@@ -12,6 +12,14 @@ Chronological, append-only. Most recent entry at the top. Each entry starts with
 Tip: `grep "^## \[" log.md | head -5` yields the last 5 entries.
 
 ---
+
+## [2026-05-13] ingest | CAPTURE domain implementation (K-1 through K-8)
+
+Extracted from 27 git commits on the `keith` branch. All 8 CAPTURE tickets are complete — including K-4 (image capture, which was a P1 droppable contingency but shipped). Key new facts: `gemini-2.5-pro` confirmed as organize model; structured output via Gemini SDK `responseSchema` (not prompt-only); confidence threshold is **0.5** (not 0.6 as previously stated in the wiki — corrected). Personal seed is exactly 6 notes with 17 entities, 3 privileged / 3 non-privileged. Cytoscape layout is **`cose`** (not generic force-directed). Created [[trellis-capture-implementation]] (topic). Updated [[auto-organization-pipeline]] (entity types table, implementation section, confidence threshold correction), [[cytoscape-js]] (cose layout, file path), [[node-color-coding]] (implementation confirmation, edge hex values), [[acme-litigation-partners]] (6-note seed table with entity breakdown), [[trellis-implementation-plan]] (K tickets marked ✓). Index updated.
+
+## [2026-05-13] ingest | Codebase structure after main-branch merge
+
+Explored four new directories introduced by merging main: `apps/`, `.agent/`, `infra/`, `docs/`. Two new sources in `.agent/`: `trellis_implementation_plan.md` (25-ticket sprint board, 3 devs) and `trellis-vault-assistant.md` (Claude system prompt for vault-grounded queries). Created [[trellis-implementation-plan]] (source + topic), [[trellis-codebase-structure]] (topic), and [[trellis-vault-assistant]] (entity). Updated [[index.md]] with 4 new entries. Key new facts: Keith=CAPTURE, Gabe=GOVERN, Nicolo=RETRIEVAL; vertical-slice file ownership; Day 0 bootstrap; daily merge order Nicolo→Gabe→Keith; 6 contingency plans; `apps/web/src/views/{auth,capture,chat,graph,publish,team}/` and `apps/api/src/{routes,services,db,prompts,seed}/` directory structure.
 
 ## [2026-05-12] note | Answered 5 questions (first batch)
 

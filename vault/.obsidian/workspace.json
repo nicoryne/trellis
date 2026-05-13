@@ -178,6 +178,7 @@
   },
   "active": "b12e86c727303de6",
   "lastOpenFiles": [
+    "questions/lobster-trap-day-5-go-no-go.md",
     "entities/harvey.md",
     "topics/trellis-demo-narrative.md.tmp.29852.ea895fe6a147",
     "concepts/attorney-client-privilege.md",
@@ -201,7 +202,6 @@
     "questions/light-theme-trigger.md",
     "questions/lobster-trap-legal-policy-defaults.md",
     "questions/lobster-trap-latency-cost-measurement.md",
-    "questions/lobster-trap-day-5-go-no-go.md",
     "questions/lablab-judging-weights-demo-vs-video.md",
     "questions/demo-off-script-query-handling.md",
     "questions/performance-review-integration.md",

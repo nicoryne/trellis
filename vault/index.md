@@ -2,7 +2,7 @@
 title: Index
 type: index
 status: active
-updated: 2026-05-12
+updated: 2026-05-13
 ---
 
 # Index
@@ -17,12 +17,14 @@ Catalog of every page in the wiki. Updated on every ingest and every lint.
 - [[trellis-project-architecture]] — MVP and V1 architecture, stack, data model, AI pipelines, API
 - [[trellis-design-guidelines]] — Brand, color, type, motion, hero moments, microcopy
 - [[trellis-context-dump]] — Full conceptual journey, decision rationale, rejected ideas, glossary
+- [[trellis-implementation-plan]] — 6-day hackathon sprint plan: 25 tickets, developer assignments, contingency plans
 
 ## Entities
 
 ### Product
 - [[trellis]] — The product itself: privacy-first knowledge fabric for law firms
 - [[stratum]] — The original codename for Trellis (do not use externally)
+- [[trellis-vault-assistant]] — Claude system prompt that answers Trellis questions grounded in the vault
 
 ### Organizations (demo)
 - [[acme-litigation-partners]] — Pre-seeded demo firm and commercial-litigation practice group
@@ -103,6 +105,9 @@ Catalog of every page in the wiki. Updated on every ingest and every lint.
 - [[hackathon-judging-fit]] — Why Trellis maps cleanly to Track 4 and the Gemini Award
 - [[trellis-decision-history]] — Ten-phase reasoning chain from Obsidian curiosity to locked MVP
 - [[trellis-rejected-ideas]] — Queryable surface of ideas explicitly ruled out (don't regress)
+- [[trellis-codebase-structure]] — Monorepo layout: apps/, .agent/, infra/, docs/, vault/ — file ownership per developer
+- [[trellis-implementation-plan]] — 6-day sprint breakdown: 25 tickets (K-1–K-8, G-1–G-8, N-1–N-8), day-by-day plan, contingencies
+- [[trellis-capture-implementation]] — CAPTURE domain (Keith) fully implemented: IDB layer, types, organize service, all capture views, personal graph, seed data
 
 ## Questions
 
