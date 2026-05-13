@@ -81,3 +81,8 @@ export async function getAllEntities(): Promise<Entity[]> {
   const db = await getDB();
   return db.getAll('entities');
 }
+
+/** Resets the DB connection for test isolation. Call in beforeEach when using fake-indexeddb. */
+export function _resetDB(): void {
+  dbPromise = null;
+}

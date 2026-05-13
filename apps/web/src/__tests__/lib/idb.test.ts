@@ -2,11 +2,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 // fake-indexeddb is imported via vitest setup file (fake-indexeddb/auto)
 import {
   createNote, getNote, getAllNotes, updateNote, deleteNote,
-  saveEntity, getAllEntities,
+  saveEntity, getAllEntities, _resetDB,
 } from '../../lib/idb';
 import type { Entity } from '../../types/index';
 
 describe('idb — notes store', () => {
+  beforeEach(() => { _resetDB(); });
+
   it('createNote generates an id and timestamps', async () => {
     const note = await createNote({
       title: 'Test',
@@ -78,6 +80,8 @@ describe('idb — notes store', () => {
 });
 
 describe('idb — entities store', () => {
+  beforeEach(() => { _resetDB(); });
+
   it('saveEntity and getAllEntities round-trip', async () => {
     const entity: Entity = { id: 'ent-1', type: 'judge', name: 'Judge Reyes', confidence: 0.98 };
     await saveEntity(entity);
