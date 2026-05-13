@@ -1,7 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { analyzeImage } from '../../api/client';
 import { useNoteStore } from '../../store/noteStore';
-import type { NoteClassification } from '../../types/index';
 
 // TODO: replace STUB_TOKEN with useAuthStore.getState().token once Gabe's authStore is wired
 const STUB_TOKEN = '';
@@ -20,7 +19,15 @@ export default function ImageCapture() {
   const inputRef = useRef<HTMLInputElement>(null);
   const { saveNote } = useNoteStore();
 
+  // Fix 1A + Fix 2: Revoke object URL when preview changes or on unmount
+  useEffect(() => {
+    const url = preview;
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [preview]);
+
   function handleFile(f: File) {
+    // Fix 7: Guard against processing a new file while not idle
+    if (state !== 'idle') return;
     setError(null);
     if (!ACCEPTED_TYPES.includes(f.type)) {
       setError('Only PNG, JPG, and WebP files are accepted.');
@@ -38,24 +45,29 @@ export default function ImageCapture() {
   async function runAnalysis(f: File) {
     setState('analyzing');
     const response = await analyzeImage(f, STUB_TOKEN);
-    if (response.error) {
+    // Fix 3: Stale request guard — bail if a newer upload has taken over
+    if (fileRef.current !== f) return;
+    // Fix 4: Replace unsafe non-null assertion with data check
+    if (!response.data) {
       setError('Image analysis failed. Try again.');
       setState('idle');
       return;
     }
-    setText(response.data!.text);
+    setText(response.data.text);
     setState('editing');
   }
 
   async function handleSave() {
     if (!fileRef.current) return;
     await saveNote({
-      title: fileRef.current.name.replace(/\.[^.]+$/, ''),
+      // Fix 8: Fallback title for dotfiles / extension-only names
+      title: fileRef.current.name.replace(/\.[^.]+$/, '') || 'Untitled image',
       body: text,
       contentType: 'image',
       imageBlob: fileRef.current,
       extractedEntities: [],
-      classification: 'observation' as NoteClassification,
+      // Fix 5: Remove unnecessary type cast
+      classification: 'observation',
       isPrivileged: false,
       isPublished: false,
     });
@@ -65,7 +77,6 @@ export default function ImageCapture() {
   function reset() {
     setState('idle');
     fileRef.current = null;
-    if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
     setText('');
     setError(null);
@@ -80,17 +91,23 @@ export default function ImageCapture() {
   return (
     <div className="max-w-3xl mx-auto flex flex-col gap-6">
       {state === 'idle' && (
+        // Fix 6: Keyboard accessibility for drop zone
         <div
           onDrop={handleDrop}
           onDragOver={e => e.preventDefault()}
           onClick={() => inputRef.current?.click()}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click(); }}
+          role="button"
+          tabIndex={0}
+          aria-label="Upload image"
           className="border-2 border-dashed rounded-lg p-12 flex flex-col items-center gap-3 cursor-pointer transition-colors hover:border-amber-500"
           style={{ borderColor: 'var(--border-default)' }}
         >
+          {/* Fix 9: Derive accept attribute from ACCEPTED_TYPES */}
           <input
             ref={inputRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp"
+            accept={ACCEPTED_TYPES.join(',')}
             className="hidden"
             onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
           />
@@ -154,8 +171,9 @@ export default function ImageCapture() {
       {error && (
         <div className="flex items-center gap-2">
           <span className="text-sm" style={{ color: 'var(--danger)' }}>{error}</span>
+          {/* Fix 1C: Call reset() directly instead of inline mutation */}
           <button
-            onClick={() => { setError(null); setState('idle'); }}
+            onClick={reset}
             className="text-sm underline"
             style={{ color: 'var(--accent-primary)' }}
           >
