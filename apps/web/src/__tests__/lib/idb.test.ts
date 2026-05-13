@@ -71,6 +71,10 @@ describe('idb — notes store', () => {
     expect(updated.updatedAt).toBeGreaterThan(originalUpdatedAt);
   });
 
+  it('updateNote throws when note does not exist', async () => {
+    await expect(updateNote('non-existent-id', { title: 'X' })).rejects.toThrow('Note non-existent-id not found');
+  });
+
   it('deleteNote removes the note', async () => {
     const note = await createNote({ title: 'Delete me', body: '', contentType: 'text', extractedEntities: [], classification: 'observation', isPrivileged: false, isPublished: false });
     await deleteNote(note.id);

@@ -57,7 +57,7 @@ export async function getAllNotes(): Promise<PersonalNote[]> {
 
 export async function updateNote(
   id: string,
-  updates: Partial<Omit<PersonalNote, 'id' | 'createdAt'>>
+  updates: Partial<Omit<PersonalNote, 'id' | 'createdAt' | 'updatedAt'>>
 ): Promise<PersonalNote> {
   const db = await getDB();
   const existing = await db.get('notes', id);
