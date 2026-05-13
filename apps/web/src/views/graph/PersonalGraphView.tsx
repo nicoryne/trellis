@@ -14,7 +14,7 @@ const navigateToCapture = () => {
   console.warn('Router not wired yet — navigate to /capture manually');
 };
 
-const CYTOSCAPE_STYLE: Cytoscape.Stylesheet[] = [
+const CYTOSCAPE_STYLE: Cytoscape.StylesheetStyle[] = [
   {
     selector: 'node',
     style: {
@@ -119,11 +119,11 @@ export default function PersonalGraphView() {
           layout={{ name: 'cose', animate: true, animationDuration: 500, randomize: false }}
           stylesheet={CYTOSCAPE_STYLE}
           style={{ width: '100%', height: '100%' }}
-          cy={cy => {
+          cy={(cy: Cytoscape.Core) => {
             if (cyRef.current === cy) return;
             cyRef.current = cy;
 
-            cy.on('tap', 'node', evt => {
+            cy.on('tap', 'node', (evt: Cytoscape.EventObject) => {
               const node = evt.target as Cytoscape.NodeSingular;
               const noteId = node.data('noteId') as string | undefined;
 
@@ -138,7 +138,7 @@ export default function PersonalGraphView() {
               }
             });
 
-            cy.on('tap', evt => {
+            cy.on('tap', (evt: Cytoscape.EventObject) => {
               // Background tap: reset all opacities
               if (evt.target === cy) {
                 cy.elements().style({ opacity: 1 });

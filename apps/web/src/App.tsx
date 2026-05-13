@@ -6,8 +6,8 @@ import { Layout } from './components/Layout';
 import { LoginView } from './views/auth/LoginView';
 import { ToastContainer } from './components/Toast';
 
-const CaptureView = lazy(() => import('./views/capture/CaptureView').then((m) => ({ default: m.CaptureView })));
-const PersonalGraphView = lazy(() => import('./views/graph/PersonalGraphView').then((m) => ({ default: m.PersonalGraphView })));
+const CaptureView = lazy(() => import('./views/capture/CaptureView'));
+const PersonalGraphView = lazy(() => import('./views/graph/PersonalGraphView'));
 const TeamGraphView = lazy(() => import('./views/team/TeamGraphView').then((m) => ({ default: m.TeamGraphView })));
 const ChatView = lazy(() => import('./views/chat/ChatView').then((m) => ({ default: m.ChatView })));
 
