@@ -1,11 +1,15 @@
 // apps/web/src/views/team/TeamGraphView.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import cytoscape, { Core } from 'cytoscape';
+import cola from 'cytoscape-cola';
 import { useAuthStore } from '../../store/authStore';
 import { fetchTeamGraph } from '../../api/teamGraph';
 import type { TeamGraph } from '../../types/index';
 import { NodeSummaryPanel } from './NodeSummaryPanel';
 import './team.css';
+
+// Register cola layout extension
+cytoscape.use(cola);
 
 const NODE_COLORS: Record<string, string> = {
   insight: '#9d4edd',
@@ -129,10 +133,26 @@ export function TeamGraphView() {
           },
         },
       ],
-      layout: { name: 'cose', animate: true, animationDuration: 600, padding: 40 },
+      // No layout yet — we run cola separately
+      layout: { name: 'preset' },
       userZoomingEnabled: true,
       userPanningEnabled: true,
     });
+
+    // Run continuous cola force-directed layout (Obsidian-style live physics)
+    const layout = cy.layout({
+      name: 'cola',
+      infinite: true,       // Never stops — continuous simulation
+      fit: false,            // Don't auto-fit, let the user pan/zoom
+      animate: true,         // Animate node positions
+      randomize: true,       // Random initial positions
+      maxSimulationTime: 0,  // Run forever
+      ungrabifyWhileSimulating: false, // Allow dragging during simulation
+      nodeSpacing: 25,       // Space between nodes
+      edgeLength: 120,       // Ideal edge length
+      padding: 40,
+    } as any);
+    layout.run();
 
     // Hover glow — Cytoscape uses canvas, CSS :hover doesn't apply
     cy.on('mouseover', 'node', (e) => {
@@ -171,8 +191,11 @@ export function TeamGraphView() {
       if (e.target === cy) setSelectedNodeId(null);
     });
 
+    // Center the graph after initial positions settle
+    setTimeout(() => cy.fit(undefined, 60), 1500);
+
     cyRef.current = cy;
-    return () => { cy.destroy(); cyRef.current = null; };
+    return () => { layout.stop(); cy.destroy(); cyRef.current = null; };
   }, [graph]);
 
   // Search filter

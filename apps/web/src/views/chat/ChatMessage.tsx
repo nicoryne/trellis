@@ -64,6 +64,10 @@ function renderContentWithCitations(
   return parts;
 }
 
+function formatTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   message,
   isStreaming,
@@ -73,76 +77,42 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   const isUser = message.role === 'user';
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: isUser ? 'flex-end' : 'flex-start',
-        marginBottom: '20px',
-        animation: 'fadeIn var(--duration-fast) var(--easing-entry)',
-      }}
-    >
-      {/* Role label */}
-      <span
-        style={{
-          fontFamily: 'var(--font-sans)',
-          fontSize: '12px',
-          fontWeight: 500,
-          color: 'var(--text-muted)',
-          marginBottom: '6px',
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-        }}
-      >
-        {isUser ? 'You' : 'Trellis'}
-      </span>
-
-      {/* Message bubble */}
-      <div
-        style={{
-          maxWidth: '85%',
-          padding: '14px 18px',
-          borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-          backgroundColor: isUser ? 'var(--accent-primary-bg)' : 'var(--bg-surface)',
-          border: `1px solid ${isUser ? 'var(--accent-primary-muted)' : 'var(--border-default)'}`,
-        }}
-      >
-        <div
-          style={{
-            fontFamily: 'var(--font-serif)',
-            fontSize: '15px',
-            lineHeight: 1.6,
-            color: 'var(--text-primary)',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-          }}
-        >
-          {isUser
-            ? message.content
-            : renderContentWithCitations(message.content, citedNodeIds, onCitationClick)}
-          {/* Streaming cursor */}
-          {isStreaming && !isUser && (
-            <span
-              style={{
-                display: 'inline-block',
-                width: '2px',
-                height: '16px',
-                backgroundColor: 'var(--accent-primary)',
-                marginLeft: '2px',
-                verticalAlign: 'text-bottom',
-                animation: 'blink 1s step-end infinite',
-              }}
-            />
-          )}
-        </div>
+    <div className={`chat-message ${isUser ? 'chat-message--user' : 'chat-message--assistant'}`}>
+      {/* Avatar */}
+      <div className={`chat-avatar ${isUser ? 'chat-avatar--user' : 'chat-avatar--assistant'}`}>
+        {isUser ? 'You' : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+        )}
       </div>
 
-      {/* Confidence badge (only for finished assistant messages) */}
-      {!isUser && !isStreaming && message.confidence && (
-        <div style={{ marginTop: '8px' }}>
-          <ConfidenceBadge confidence={message.confidence} sourceCount={message.sourceCount} />
+      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* Message bubble */}
+        <div className={`chat-bubble ${isUser ? 'chat-bubble--user' : 'chat-bubble--assistant'}`}>
+          <div className="chat-bubble-content">
+            {isUser
+              ? message.content
+              : renderContentWithCitations(message.content, citedNodeIds, onCitationClick)}
+            {/* Streaming cursor */}
+            {isStreaming && !isUser && <span className="streaming-cursor" />}
+          </div>
         </div>
-      )}
+
+        {/* Timestamp */}
+        <div className="chat-timestamp" style={{ textAlign: isUser ? 'right' : 'left' }}>
+          {formatTime(message.timestamp)}
+        </div>
+
+        {/* Confidence badge (only for finished assistant messages) */}
+        {!isUser && !isStreaming && message.confidence && (
+          <div style={{ marginTop: '4px' }}>
+            <ConfidenceBadge confidence={message.confidence} sourceCount={message.sourceCount} />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

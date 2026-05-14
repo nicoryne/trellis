@@ -46,7 +46,8 @@ export function LoginView() {
     <div className="login-root">
       <div className="login-card">
         <span className="login-wordmark">Trellis</span>
-        <h1 className="login-title">Sign in to Trellis</h1>
+        <span className="login-subtitle">Legal Knowledge Management</span>
+        <h1 className="login-title">Sign in</h1>
 
         <form onSubmit={handleSubmit}>
           <div className="login-field">
@@ -76,12 +77,21 @@ export function LoginView() {
             />
           </div>
 
-          {error && <p className="login-error">{error}</p>}
+          {error && (
+            <p className="login-error">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              {error}
+            </p>
+          )}
 
           <button type="submit" className="login-btn" disabled={loading}>
             {loading ? 'Signing in...' : 'Continue'}
           </button>
         </form>
+
+        <div className="login-footer">
+          Powered by Trellis — Knowledge lives here.
+        </div>
       </div>
     </div>
   );

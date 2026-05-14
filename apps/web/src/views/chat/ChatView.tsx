@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send } from 'lucide-react';
+import { Send, MessageSquare } from 'lucide-react';
 import { useChatStore } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
 import { streamChat } from '../../api/chat';
@@ -7,18 +7,29 @@ import { ChatMessageComponent } from './ChatMessage';
 import { NodeSummaryPanel } from './NodeSummaryPanel';
 import { SourcesPanel } from './SourcesPanel';
 import { QueryOverlay } from './QueryOverlay';
+import './chat.css';
 
 /**
  * ChatView — the main "Chat with Team Brain" page.
  * Hero Moment 2 (design guidelines §8.2).
  *
  * Features:
- *   - Streaming SSE responses
+ *   - Welcome state with suggested questions
+ *   - Streaming SSE responses with thinking animation
  *   - Inline citation chips → node summary panel
  *   - Confidence badge
  *   - Query overlay animation trigger
  *   - Refusal state
+ *   - Message history preserved during session
  */
+
+const SUGGESTED_QUERIES = [
+  'What strategies work for cross-examining expert witnesses?',
+  'How do we handle summary judgment motions?',
+  'What are our deposition timeline strategies?',
+  'How should we approach settlement negotiations?',
+];
+
 export const ChatView: React.FC = () => {
   const [input, setInput] = useState('');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -26,6 +37,7 @@ export const ChatView: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
 
   const {
     messages,
@@ -49,11 +61,11 @@ export const ChatView: React.FC = () => {
     inputRef.current?.focus();
   }, []);
 
-  const handleSubmit = useCallback(async () => {
-    const query = input.trim();
+  const handleSubmit = useCallback(async (overrideQuery?: string) => {
+    const query = (overrideQuery ?? input).trim();
     if (!query || isStreaming) return;
 
-    setInput('');
+    if (!overrideQuery) setInput('');
     addUserMessage(query);
 
     try {
@@ -87,82 +99,45 @@ export const ChatView: React.FC = () => {
     }
   };
 
+  const canSend = input.trim() && !isStreaming;
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        backgroundColor: 'var(--bg-canvas)',
-        position: 'relative',
-        opacity: overlayActive ? 0.3 : 1,
-        transition: `opacity 150ms var(--easing-default)`,
-        pointerEvents: overlayActive ? 'none' : 'auto',
-      }}
-    >
+    <div className={`chat-root${overlayActive ? ' overlay-active' : ''}`}>
       {/* Header */}
-      <div
-        style={{
-          padding: '20px 24px 16px',
-          borderBottom: '1px solid var(--border-muted)',
-        }}
-      >
-        <h1
-          style={{
-            fontFamily: 'var(--font-serif)',
-            fontSize: '24px',
-            fontWeight: 700,
-            color: 'var(--text-primary)',
-            margin: 0,
-          }}
-        >
-          Team Brain
-        </h1>
+      <div className="chat-header">
+        <h1>Team Brain</h1>
+        <div className="chat-header-sub">
+          Ask questions grounded in your firm's knowledge graph
+        </div>
       </div>
 
       {/* Messages area */}
-      <div
-        style={{
-          flex: 1,
-          overflow: 'auto',
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
+      <div className="chat-messages">
         {messages.length === 0 && (
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px',
-            }}
-          >
-            <p
-              style={{
-                fontFamily: 'var(--font-serif)',
-                fontSize: '18px',
-                color: 'var(--text-secondary)',
-                textAlign: 'center',
-                maxWidth: '400px',
-                lineHeight: 1.6,
-              }}
-            >
-              Ask a question grounded in your firm's accumulated knowledge.
-            </p>
-            <p
-              style={{
-                fontFamily: 'var(--font-sans)',
-                fontSize: '13px',
-                color: 'var(--text-muted)',
-                textAlign: 'center',
-              }}
-            >
-              Responses are cited from the team graph. No hallucination.
-            </p>
+          <div className="chat-welcome">
+            <div className="chat-welcome-icon">
+              <MessageSquare size={24} />
+            </div>
+            <span className="chat-welcome-title">
+              {user ? `Welcome, ${user.displayName.split(' ')[0]}` : 'Welcome to Team Brain'}
+            </span>
+            <span className="chat-welcome-desc">
+              Ask a question and receive answers cited directly from your firm's published insights. 
+              Every response is grounded — no hallucination.
+            </span>
+
+            {/* Suggested queries */}
+            <div className="chat-welcome-suggestions">
+              {SUGGESTED_QUERIES.map((q) => (
+                <button
+                  key={q}
+                  className="chat-suggestion"
+                  onClick={() => handleSubmit(q)}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -187,26 +162,31 @@ export const ChatView: React.FC = () => {
               )}
           </React.Fragment>
         ))}
+
+        {/* Thinking indicator — shows when streaming starts but no content yet */}
+        {isStreaming && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && messages[messages.length - 1]?.content === '' && (
+          <div className="chat-thinking">
+            <div className="chat-avatar chat-avatar--assistant">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+              </svg>
+            </div>
+            <div className="thinking-dots">
+              <span className="thinking-dot" />
+              <span className="thinking-dot" />
+              <span className="thinking-dot" />
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input area */}
-      <div
-        style={{
-          padding: '16px 24px 20px',
-          borderTop: '1px solid var(--border-muted)',
-          backgroundColor: 'var(--bg-surface)',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            gap: '12px',
-            maxWidth: '800px',
-            margin: '0 auto',
-          }}
-        >
+      <div className="chat-input-area">
+        <div className="chat-input-container">
           <textarea
             ref={inputRef}
             value={input}
@@ -215,53 +195,13 @@ export const ChatView: React.FC = () => {
             placeholder="Ask the firm..."
             disabled={isStreaming}
             rows={1}
-            style={{
-              flex: 1,
-              resize: 'none',
-              padding: '12px 16px',
-              borderRadius: '12px',
-              border: '1px solid var(--border-default)',
-              backgroundColor: 'var(--bg-canvas)',
-              color: 'var(--text-primary)',
-              fontFamily: 'var(--font-serif)',
-              fontSize: '15px',
-              lineHeight: 1.6,
-              outline: 'none',
-              transition: `border-color var(--duration-fast) var(--easing-default)`,
-              minHeight: '44px',
-              maxHeight: '120px',
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'var(--accent-primary)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border-default)';
-            }}
+            className="chat-input"
           />
           <button
-            onClick={handleSubmit}
-            disabled={!input.trim() || isStreaming}
+            onClick={() => handleSubmit()}
+            disabled={!canSend}
             aria-label="Send message"
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '12px',
-              border: 'none',
-              backgroundColor:
-                input.trim() && !isStreaming
-                  ? 'var(--accent-primary)'
-                  : 'var(--bg-surface-raised)',
-              color:
-                input.trim() && !isStreaming
-                  ? 'var(--bg-canvas)'
-                  : 'var(--text-muted)',
-              cursor: input.trim() && !isStreaming ? 'pointer' : 'not-allowed',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: `all var(--duration-fast) var(--easing-default)`,
-              flexShrink: 0,
-            }}
+            className={`chat-send-btn ${canSend ? 'chat-send-btn--active' : 'chat-send-btn--disabled'}`}
           >
             <Send size={18} />
           </button>
