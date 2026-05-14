@@ -189,9 +189,10 @@
 /* ─── Message ────────────────────────────────────────────────────────────── */
 .chat-message {
   display: flex;
-  gap: 12px;
-  margin-bottom: 28px;
+  gap: 10px;
+  margin-bottom: 20px;
   width: 100%;
+  align-items: flex-start;
   animation: fadeIn 250ms var(--easing-entry);
 }
 
@@ -225,9 +226,9 @@
 }
 
 .chat-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -237,45 +238,46 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   overflow: hidden;
+  margin-top: 2px;
 }
 
 .chat-avatar--user {
-  background: var(--accent-primary-bg);
-  border: 1px solid var(--accent-primary-muted);
+  background: rgba(var(--accent-primary-rgb), 0.16);
+  border: 1px solid rgba(var(--accent-primary-rgb), 0.32);
   color: var(--accent-primary);
 }
 
 .chat-avatar--assistant {
-  background: var(--bg-surface);
+  background: var(--bg-surface-raised);
   border: 1px solid var(--border-default);
   color: var(--accent-primary);
-  padding: 4px;
+  padding: 5px;
 }
 
 .chat-bubble {
   padding: 12px 16px;
-  border-radius: 12px;
+  border-radius: 18px;
   width: fit-content;
   max-width: 100%;
 }
 
 .chat-bubble--user {
-  background: var(--accent-primary-bg);
-  border: 1px solid var(--accent-primary-muted);
-  border-top-right-radius: 4px;
+  background: rgba(var(--accent-primary-rgb), 0.14);
+  border: 1px solid rgba(var(--accent-primary-rgb), 0.28);
+  color: var(--text-primary);
+  border-top-right-radius: 6px;
 }
 
 .chat-bubble--assistant {
-  background: var(--bg-surface);
+  background: var(--bg-surface-raised);
   border: 1px solid var(--border-default);
-  border-top-left-radius: 4px;
+  border-top-left-radius: 6px;
 }
 
-/* Refusal — softer, no accent — distinguishes "no firm knowledge" from a real answer */
+/* Refusal — softer fill, italic content — distinguishes "no firm knowledge" from a real answer */
 .chat-bubble--refusal {
   background: var(--bg-surface);
-  border: 1px dashed var(--border-default);
-  color: var(--text-secondary);
+  border: 1px solid var(--border-muted);
 }
 
 .chat-bubble-content {
@@ -296,23 +298,29 @@
 .chat-meta {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-top: 6px;
+  padding: 0 4px;
   flex-wrap: wrap;
+}
+
+.chat-message--user .chat-meta {
+  justify-content: flex-end;
 }
 
 .chat-timestamp {
   font-family: var(--font-sans);
   font-size: 11px;
   color: var(--text-muted);
+  letter-spacing: 0.02em;
 }
 
 /* ─── Refusal CTA ─────────────────────────────────────────────────────────── */
 .chat-refusal-cta {
   display: flex;
   justify-content: flex-start;
-  padding: 0 0 24px 44px; /* aligns with the assistant bubble column */
-  margin-top: -8px;
+  padding: 0 0 24px 44px; /* aligns with the assistant bubble column (34px avatar + 10px gap) */
+  margin-top: -4px;
 }
 
 /* ─── Thinking Indicator ─────────────────────────────────────────────────── */
@@ -328,10 +336,10 @@
   align-items: center;
   gap: 4px;
   padding: 14px 20px;
-  background: var(--bg-surface);
+  background: var(--bg-surface-raised);
   border: 1px solid var(--border-default);
-  border-radius: 12px;
-  border-top-left-radius: 4px;
+  border-radius: 18px;
+  border-top-left-radius: 6px;
 }
 
 .thinking-dot {
