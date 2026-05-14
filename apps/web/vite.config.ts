@@ -9,6 +9,12 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    // Ensure React resolves to a single copy so motion/framer-motion's
+    // optional-peer React import doesn't get stubbed by rolldown.
+    dedupe: ['react', 'react-dom'],
+  },
+  optimizeDeps: {
+    include: ['motion/react', 'react', 'react-dom'],
   },
   server: {
     port: 5173,

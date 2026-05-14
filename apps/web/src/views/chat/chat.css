@@ -343,7 +343,7 @@
 
 .chat-send-btn--active:hover {
   background: var(--accent-primary-hover);
-  box-shadow: 0 0 20px rgba(212, 167, 44, 0.15);
+  box-shadow: 0 0 20px rgba(var(--accent-primary-rgb), 0.18);
 }
 
 .chat-send-btn--disabled {

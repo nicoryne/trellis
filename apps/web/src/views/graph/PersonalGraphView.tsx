@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, Network } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import cytoscape from 'cytoscape';
 import cola from 'cytoscape-cola';
@@ -9,6 +9,7 @@ import {
   NODE_COLORS,
   EDGE_COLOR_HOVER,
 } from '../../lib/graphUtils';
+import { Logo } from '../../components/Logo';
 
 // Register cola layout extension (idempotent)
 cytoscape.use(cola);
@@ -98,7 +99,7 @@ export default function PersonalGraphView() {
             width: 20,
             height: 20,
             'border-width': 2,
-            'border-color': '#d4a72c',
+            'border-color': '#fb8500',
             'shadow-blur': 24,
             'shadow-opacity': 0.9,
             'background-opacity': 1,
@@ -242,8 +243,8 @@ export default function PersonalGraphView() {
   if (notes.length === 0) {
     return (
       <div className="empty-state" style={{ height: '100%' }}>
-        <div className="empty-state-icon">
-          <Network size={28} />
+        <div className="empty-state-logo">
+          <Logo size={64} />
         </div>
         <span className="empty-state-title">Your personal graph is empty</span>
         <span className="empty-state-desc">

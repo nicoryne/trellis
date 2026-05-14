@@ -15,10 +15,11 @@
   --text-muted: #484f58;
 
   /* Accent */
-  --accent-primary: #d4a72c;
-  --accent-primary-hover: #e3b341;
-  --accent-primary-muted: #7d5f1a;
-  --accent-primary-bg: #2d2410;
+  --accent-primary: #fb8500;
+  --accent-primary-hover: #ff9d2a;
+  --accent-primary-muted: #8a4900;
+  --accent-primary-bg: #2d1a06;
+  --accent-primary-rgb: 251, 133, 0;
 
   /* Semantic */
   --success: #3fb950;
@@ -32,10 +33,10 @@
   --node-party: #ef476f;
   --node-lawyer: #118ab2;
   --node-judge: #073b4c;
-  --node-witness: #ff9f1c;
+  --node-witness: #ffd60a;
   --node-concept: #8338ec;
   --node-precedent: #3a86ff;
-  --node-statute: #fb5607;
+  --node-statute: #d62828;
 
   /* Typography */
   --font-serif: 'Source Serif Pro', 'Source Serif 4', Georgia, serif;

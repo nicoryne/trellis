@@ -13,7 +13,7 @@ updated: 2026-05-12
 
 ## Status
 
-**Open** — awaiting Keith's answer.
+**Open**, but with a real-world data point — see Addendum below.
 
 ## Why it matters
 
@@ -34,7 +34,16 @@ The `team_graph_nodes.embedding` column is typed `vector(768)` to match `text-em
 
 ## Answer
 
-_(pending)_
+_(pending — the canonical strategy is still unwritten)_
+
+## Addendum — 2026-05-14
+
+The architecture spec called for `text-embedding-004`, but the implementation moved to **`gemini-embedding-001`** (commits `0164277` + `b522b13`) because the SDK doesn't expose `text-embedding-004`. The migration preserved the 768-dim schema by passing `outputDimensionality: 768` on every `embedContent` call. So:
+
+- A model rev that **supports `outputDimensionality`** is a drop-in swap with no schema change and no re-embedding.
+- A model rev that **does not** support `outputDimensionality`, or that ships at a different native dimension, still blocks production — the original question is open for that case.
+
+The implementation lesson: pinning `outputDimensionality` to the schema column is a cheap insurance policy. The question above remains the *full* migration strategy; this is a partial mitigation, not an answer.
 
 ## Related
 

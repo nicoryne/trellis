@@ -18,6 +18,7 @@ Catalog of every page in the wiki. Updated on every ingest and every lint.
 - [[trellis-design-guidelines]] — Brand, color, type, motion, hero moments, microcopy
 - [[trellis-context-dump]] — Full conceptual journey, decision rationale, rejected ideas, glossary
 - [[trellis-implementation-plan]] — 6-day hackathon sprint plan: 25 tickets, developer assignments, contingency plans
+- [[trellis-seed-data-analysis]] — Nicolo's executive summary of the complete seeding system across auth, team graph, and personal notes
 
 ## Entities
 
@@ -87,6 +88,7 @@ Catalog of every page in the wiki. Updated on every ingest and every lint.
 - [[hero-moments]] — Three UI surfaces where design polish must concentrate
 - [[adoption-strategy]] — Two pillars + departure-capture exception + reinforcing reciprocity
 - [[ethical-wall]] — Chinese-wall doctrine; V1+ retrieval-filter requirement
+- [[derived-edges]] — Obsidian-style automatic connections in the team and personal graphs: shared-entity, classification-hub, embedding-similarity, entity-co-occurrence
 
 ## Topics
 

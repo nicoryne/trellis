@@ -17,10 +17,10 @@ const NODE_COLORS: Record<string, string> = {
   party: '#ef476f',
   lawyer: '#118ab2',
   judge: '#073b4c',
-  witness: '#ff9f1c',
+  witness: '#ffd60a',
   concept: '#8338ec',
   precedent: '#3a86ff',
-  statute: '#fb5607',
+  statute: '#d62828',
 };
 
 export function TeamGraphView() {
@@ -111,7 +111,7 @@ export function TeamGraphView() {
           style: {
             width: 20,
             height: 20,
-            'border-color': '#d4a72c',
+            'border-color': '#fb8500',
             'border-width': 2,
             'shadow-blur': 24,
             'shadow-opacity': 0.9,

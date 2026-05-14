@@ -27,7 +27,7 @@ export default function AudioCapture() {
     wavesurferRef.current = WaveSurfer.create({
       container: waveContainerRef.current,
       waveColor: '#7d8590',
-      progressColor: '#d4a72c',
+      progressColor: '#fb8500',
       height: 64,
       barWidth: 2,
       barGap: 1,

@@ -1,5 +1,6 @@
 // apps/web/src/components/Toast.tsx
 import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import './toast.css';
 
 interface ToastItem {
@@ -36,11 +37,22 @@ export function ToastContainer() {
 
   return (
     <div className="toast-container" aria-live="polite">
-      {toasts.map((t) => (
-        <div key={t.id} className={`toast ${t.variant}`} role="status">
-          {t.message}
-        </div>
-      ))}
+      <AnimatePresence initial={false}>
+        {toasts.map((t) => (
+          <motion.div
+            key={t.id}
+            className={`toast ${t.variant}`}
+            role="status"
+            layout
+            initial={{ opacity: 0, x: 24, scale: 0.96 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 24, scale: 0.96, transition: { duration: 0.18 } }}
+            transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+          >
+            {t.message}
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </div>
   );
 }

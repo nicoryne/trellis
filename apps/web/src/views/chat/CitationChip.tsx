@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 
 interface CitationChipProps {
   indices: number[];
@@ -7,44 +8,42 @@ interface CitationChipProps {
 
 /**
  * Inline citation chip: [1], [2,3] format.
- * Monospace, amber background, clickable.
+ * Monospace, accent-tinted background, clickable.
  * Per design guidelines §9.6.
  */
 export const CitationChip: React.FC<CitationChipProps> = ({ indices, onClick }) => {
   return (
-    <span
+    <motion.span
       role="button"
       tabIndex={0}
       onClick={() => onClick(indices[0])}
-      onKeyDown={(e) => {
+      onKeyDown={(e: React.KeyboardEvent<HTMLSpanElement>) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onClick(indices[0]);
         }
       }}
+      whileHover={{ scale: 1.06, y: -1 }}
+      whileTap={{ scale: 0.96 }}
+      transition={{ type: 'spring', stiffness: 420, damping: 22 }}
       style={{
-        display: 'inline',
+        display: 'inline-block',
         fontFamily: 'var(--font-mono)',
-        fontSize: '12px',
+        fontSize: '11px',
         lineHeight: 1.3,
         backgroundColor: 'var(--accent-primary-bg)',
         color: 'var(--accent-primary)',
-        padding: '1px 5px',
-        borderRadius: '3px',
+        border: '1px solid var(--accent-primary-muted)',
+        padding: '0 5px',
+        borderRadius: '4px',
         cursor: 'pointer',
         verticalAlign: 'super',
-        transition: `background-color var(--duration-fast) var(--easing-default)`,
         userSelect: 'none',
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--accent-primary-muted)';
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--accent-primary-bg)';
+        transformOrigin: 'center',
       }}
       aria-label={`Citation ${indices.join(', ')}`}
     >
       [{indices.join(',')}]
-    </span>
+    </motion.span>
   );
 };

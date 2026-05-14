@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { fetchTeamGraph } from '../../api/chat';
 
 interface QueryOverlayProps {
@@ -13,10 +14,10 @@ const NODE_COLORS: Record<string, string> = {
   party: '#ef476f',
   lawyer: '#118ab2',
   judge: '#073b4c',
-  witness: '#ff9f1c',
+  witness: '#ffd60a',
   concept: '#8338ec',
   precedent: '#3a86ff',
-  statute: '#fb5607',
+  statute: '#d62828',
 };
 
 /**
@@ -35,7 +36,7 @@ function stableJitter(index: number, seed: number): number {
  *   1. Fades in with backdrop blur (400ms)
  *   2. Renders team graph at center with all nodes at 15% opacity
  *   3. Pulses cited nodes to 100% in rank order (150ms stagger)
- *   4. Edges between cited nodes illuminate to amber
+ *   4. Edges between cited nodes illuminate to orange
  *   5. Holds for ~1s then fades out (600ms)
  *
  * Uses canvas for performance (60fps).
@@ -123,7 +124,7 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
       ctx.moveTo(source.x, source.y);
       ctx.lineTo(target.x, target.y);
       ctx.strokeStyle = isCitedEdge
-        ? `rgba(212, 167, 44, ${overlayOpacity})`
+        ? `rgba(251, 133, 0, ${overlayOpacity})`
         : `rgba(48, 54, 61, ${overlayOpacity * 0.4})`;
       ctx.lineWidth = isCitedEdge ? 2 : 0.5;
       ctx.stroke();
@@ -236,22 +237,49 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
         }}
       />
       {/* Label */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: '48px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontFamily: 'var(--font-sans)',
-          fontSize: '14px',
-          color: `rgba(125, 133, 144, ${overlayOpacity})`,
-          letterSpacing: '1px',
-          textTransform: 'uppercase',
-          pointerEvents: 'none',
-        }}
-      >
-        Searching firm knowledge...
-      </div>
+      <AnimatePresence>
+        {overlayOpacity > 0.4 && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.35, ease: [0, 0, 0.2, 1] }}
+            style={{
+              position: 'absolute',
+              bottom: '48px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              fontFamily: 'var(--font-sans)',
+              fontSize: '12px',
+              color: 'var(--text-secondary)',
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              pointerEvents: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            Searching firm knowledge
+            <span style={{ display: 'inline-flex', gap: 3 }}>
+              {[0, 1, 2].map((i) => (
+                <motion.span
+                  key={i}
+                  animate={{ opacity: [0.25, 1, 0.25] }}
+                  transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.18, ease: 'easeInOut' }}
+                  style={{
+                    width: 3,
+                    height: 3,
+                    borderRadius: 999,
+                    background: 'var(--accent-primary)',
+                    display: 'inline-block',
+                  }}
+                />
+              ))}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

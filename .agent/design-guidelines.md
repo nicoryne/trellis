@@ -40,14 +40,14 @@ Reference points (in priority order):
 | `text-secondary` | `#7d8590` | Secondary text, metadata |
 | `text-muted` | `#484f58` | Disabled, placeholders |
 
-### 2.3 Accent palette (amber/gold for institutional credibility)
+### 2.3 Accent palette (orange for institutional credibility)
 
 | Token | Hex | Use |
 |---|---|---|
-| `accent-primary` | `#d4a72c` | Primary actions, links, focus rings |
-| `accent-primary-hover` | `#e3b341` | Hover state |
-| `accent-primary-muted` | `#7d5f1a` | Subtle highlights, badges |
-| `accent-primary-bg` | `#2d2410` | Accent-tinted backgrounds |
+| `accent-primary` | `#fb8500` | Primary actions, links, focus rings |
+| `accent-primary-hover` | `#ff9d2a` | Hover state |
+| `accent-primary-muted` | `#8a4900` | Subtle highlights, badges |
+| `accent-primary-bg` | `#2d1a06` | Accent-tinted backgrounds |
 
 ### 2.4 Semantic palette
 
@@ -60,7 +60,7 @@ Reference points (in priority order):
 
 ### 2.5 Graph node color coding
 
-> **Strict rule: no graph node color may overlap with the accent palette (gold/amber) or semantic palette.** This keeps UI signals (selection, alerts) visually distinct from data.
+> **Strict rule: no graph node color may overlap with the accent palette (orange) or semantic palette.** This keeps UI signals (selection, alerts) visually distinct from data.
 
 | Node Type | Hex | Visual |
 |---|---|---|
@@ -69,12 +69,12 @@ Reference points (in priority order):
 | `party` | `#ef476f` | Magenta — clients, opposing parties |
 | `lawyer` | `#118ab2` | Steel blue — firm lawyers, opposing counsel |
 | `judge` | `#073b4c` (with outline) | Deep slate with white outline — judicial figures |
-| `witness` | `#ff9f1c` | Orange — expert and fact witnesses |
+| `witness` | `#ffd60a` | Saffron — expert and fact witnesses |
 | `concept` | `#8338ec` | Violet — legal concepts, doctrines |
 | `precedent` | `#3a86ff` | Sky blue — case law |
-| `statute` | `#fb5607` | Vermillion — statutory authority |
+| `statute` | `#d62828` | Crimson — statutory authority |
 
-Edges inherit a neutral `#30363d` at rest and brighten to `#7d8590` on hover. Cited edges during query overlay illuminate to `accent-primary` (amber) — this is the only place an accent color appears in graph viz, signaling "active cited path."
+Edges inherit a neutral `#30363d` at rest and brighten to `#7d8590` on hover. Cited edges during query overlay illuminate to `accent-primary` (orange) — this is the only place an accent color appears in graph viz, signaling "active cited path."
 
 ---
 
@@ -448,10 +448,10 @@ Suggested implementation in `apps/web/src/styles/tokens.css`:
   --text-muted: #484f58;
 
   /* Accent */
-  --accent-primary: #d4a72c;
-  --accent-primary-hover: #e3b341;
-  --accent-primary-muted: #7d5f1a;
-  --accent-primary-bg: #2d2410;
+  --accent-primary: #fb8500;
+  --accent-primary-hover: #ff9d2a;
+  --accent-primary-muted: #8a4900;
+  --accent-primary-bg: #2d1a06;
 
   /* Semantic */
   --success: #3fb950;
@@ -465,10 +465,10 @@ Suggested implementation in `apps/web/src/styles/tokens.css`:
   --node-party: #ef476f;
   --node-lawyer: #118ab2;
   --node-judge: #073b4c;
-  --node-witness: #ff9f1c;
+  --node-witness: #ffd60a;
   --node-concept: #8338ec;
   --node-precedent: #3a86ff;
-  --node-statute: #fb5607;
+  --node-statute: #d62828;
 
   /* Type */
   --font-serif: 'Source Serif Pro', Georgia, serif;

@@ -23,8 +23,8 @@
   font-family: var(--font-sans);
   font-size: 14px;
   color: var(--text-primary);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-  animation: toast-in var(--duration-default) var(--easing-entry) forwards;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  /* Animation now driven by motion/AnimatePresence */
 }
 
 .toast.error {
@@ -33,9 +33,4 @@
 
 .toast.warning {
   border-left-color: var(--warning);
-}
-
-@keyframes toast-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
 }

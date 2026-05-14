@@ -23,7 +23,7 @@ A 0–100% confidence metric attached to every redacted note. Computed by a sing
 
 ## Visual treatment
 
-Per [[trellis-design-guidelines]] §8.1, the score is rendered at the top of the redaction modal as a **5-dot bar filling left-to-right**: green at high, amber at medium, red at low.
+Per [[trellis-design-guidelines]] §8.1, the score is rendered at the top of the redaction modal as a **5-dot bar filling left-to-right**: green (`success #3fb950`) at high, **amber** (`warning #d29922`) at medium, red (`danger #f85149`) at low. The medium-tier color is drawn from the *semantic* palette, not the accent palette — so the 2026-05-14 accent revision from amber-gold to orange does not affect this surface.
 
 ```
 Insight preservation: ●●●○○ 73%   ▼ details

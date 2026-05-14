@@ -9,7 +9,7 @@ publication: Internal design doc
 published: 2026 (v1, hackathon stage)
 ingested: 2026-05-12
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-14
 ---
 
 # Trellis · Design Guidelines
@@ -18,7 +18,7 @@ updated: 2026-05-12
 
 ## One-line summary
 
-How Trellis looks, reads, and moves. Dark mode primary, GitHub-classic neutrals with amber-gold accent, Source Serif Pro for body and Inter for UI, force-directed graphs as the spine, motion subtle except for the [[query-overlay-animation]] which is deliberately slow.
+How Trellis looks, reads, and moves. Dark mode primary, GitHub-classic neutrals with **orange `#fb8500`** accent (revised from amber-gold `#d4a72c` on 2026-05-14), Source Serif Pro for body and Inter for UI, force-directed graphs as the spine, motion subtle except for the [[query-overlay-animation]] which is deliberately slow.
 
 ## Why it's here
 
@@ -29,7 +29,7 @@ The visual and verbal language of the product. Anchors [[trellis-design-system]]
 - **Brand personality**: modern, sleek, minimal, confident, institutional, intelligent. Not playful. No emoji in microcopy. No exclamation points.
 - **Reference points (in priority order)**: [[harvey|Harvey]] (legal credibility, dark restrained), [[notion|Notion]] (density, structured editing), [[obsidian|Obsidian]] (graph aesthetic).
 - **Theme**: dark mode primary. Light mode is V2.
-- **Palette**: GitHub-classic dark neutrals + amber-gold accent (`#d4a72c`). Semantic palette: success `#3fb950`, warning `#d29922`, danger `#f85149`, info `#58a6ff`.
+- **Palette**: GitHub-classic dark neutrals + **orange accent (`#fb8500`)**, hover `#ff9d2a`, muted `#8a4900`, bg-tint `#2d1a06`. Semantic palette: success `#3fb950`, warning `#d29922`, danger `#f85149`, info `#58a6ff`. (Accent revised from amber-gold `#d4a72c` on 2026-05-14 — see [[log]].)
 - **Strict rule**: [[node-color-coding|graph node colors]] never overlap with accent or semantic palettes. Keeps data distinct from UI signals.
 - **Typography**: Source Serif Pro (body, headings), Inter (UI/nav/labels), JetBrains Mono (citation IDs, metadata). Avoid 800/900 weights.
 - **Spacing**: 4px scale; Tailwind defaults. Density philosophy: spacious when consuming, dense when producing/scanning.
@@ -69,6 +69,21 @@ The visual and verbal language of the product. Anchors [[trellis-design-system]]
 - [[query-overlay-animation]] — refined with frame-by-frame choreography
 - [[node-color-coding]] — created with the strict-non-overlap rule
 - [[trellis]] — brand personality bullet added
+
+## Re-ingest 2026-05-14 — accent color revision
+
+Accent palette swapped from amber-gold to orange. Concrete changes:
+
+| Token | Before | After |
+|---|---|---|
+| `accent-primary` | `#d4a72c` | `#fb8500` |
+| `accent-primary-hover` | (n/a) | `#ff9d2a` |
+| `accent-primary-muted` | (n/a) | `#8a4900` |
+| `accent-primary-bg` | (legacy tint) | `#2d1a06` |
+| Section 2.3 header | "Accent palette (amber/gold for institutional credibility)" | "Accent palette (orange for institutional credibility)" |
+| Strict-rule wording (§2.5) | "no graph node color may overlap with the accent palette (gold/amber)" | "no graph node color may overlap with the accent palette (orange)" |
+
+Propagated to: [[node-color-coding]] (palette rule + cited-edge color), [[query-overlay-animation]] (cited-edge illumination), [[insight-preservation-score]] (dot color label), [[hero-moments]] (confidence pill, preservation bar labels), [[rag-query-pipeline]] (confidence pill description), [[trellis-design-system]] (accent table + section heading), [[trellis-implementation-plan]] (G-2 active-state description), [[trellis-govern-implementation]] (token value), [[trellis-retrieval-implementation]] (cited-edge illumination). `raw/design-guidelines.md` and `raw/context-dump.md` left as-is per the immutability rule.
 
 ## Contradictions or tensions
 

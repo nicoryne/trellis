@@ -58,7 +58,7 @@ See [[redaction-pipeline]] for the canonical concept page. Implementation specif
   - `\b[\w.-]+@[\w.-]+\.\w+\b` → `[EMAIL]`
   - `\b\d{3}[-.]?\d{3}[-.]?\d{4}\b` → `[PHONE]`
 - **Preservation score**: `gemini-2.5-flash` with `prompts/preserve.md`; output JSON `{ score: 0–100, reason: string }`; **fallback value `50` on parse error**
-- **Embedding model**: `text-embedding-004` (768 dim) via `services/embedding.ts`
+- **Embedding model**: `gemini-embedding-001` (768-dim, output-dimensionality-pinned) (768 dim) via `services/embedding.ts`
 
 ### Routes (`routes/publish.ts`)
 
@@ -81,9 +81,14 @@ See [[redaction-pipeline]] for the canonical concept page. Implementation specif
 
 - **Top nav height**: **56px** (`shell.css`)
 - **Side nav width**: **240px**
-- **Nav items** (`SideNav.tsx`): `/graph` (Personal Graph), `/capture` (Capture), `/team` (Team Graph), `/chat` (Chat). Icons from Lucide React.
+- **Nav items** (`SideNav.tsx`) — post-polish (commit `5b5336d`) reorganized into two labeled sections:
+  - **Personal**: `/capture` (Capture), `/graph` (Personal Graph)
+  - **Team**: `/team` (Team Graph), `/chat` (Chat)
+  - Icons from Lucide React; icon size reduced to 18px for visual hierarchy
+- **TopNav**: now displays a role badge next to the display name using `ROLE_LABELS` map (`lawyer` → "Lawyer", `practice_group_lead` → "Lead", `knowledge_admin` → "Admin")
 - **Protected route**: `ProtectedRoute` wrapper checks `useAuthStore().token`; redirects to `/login` if missing
 - **Active state**: background `var(--accent-primary-bg)`, foreground and SVG icon `var(--accent-primary)`
+- **Login page polish** (`login.css`, post-polish): "Legal Knowledge Management" subtitle below wordmark, error icon (SVG circle-with-X) beside error text, footer tagline "Powered by Trellis — Knowledge lives here.", card fade-in 400ms (`@keyframes loginFadeIn`), radial gradient glow behind card, focus rings and error-state box-shadows on inputs
 
 ## Toast
 
@@ -104,7 +109,7 @@ See [[redaction-pipeline]] for the canonical concept page. Implementation specif
 
 - **Motion durations**: `--duration-fast: 150ms`, `--duration-default: 250ms`, `--duration-slow: 400ms`, `--duration-deliberate: 700ms`
 - **Reduced-motion fallback**: `prefers-reduced-motion: reduce` collapses transitions/animations to `0.01ms`
-- **Accent**: `#d4a72c` (gold/amber)
+- **Accent**: `#fb8500` (orange) — revised from amber-gold `#d4a72c` on 2026-05-14 along with the design-guidelines update; hover `#ff9d2a`, muted `#8a4900`, bg-tint `#2d1a06`
 - **Typography**: Source Serif 4 (headings/prose), Inter (UI), JetBrains Mono (code)
 
 ## Types added (`apps/web/src/types/index.ts`)

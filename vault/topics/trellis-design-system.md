@@ -10,7 +10,7 @@ updated: 2026-05-12
 
 # Trellis design system
 
-Synthesis of [[trellis-design-guidelines]] for quick reference. Dark mode primary, GitHub-classic neutrals, amber-gold accent, Source Serif Pro for body, Inter for UI, JetBrains Mono for code/citations.
+Synthesis of [[trellis-design-guidelines]] for quick reference. Dark mode primary, GitHub-classic neutrals, **orange accent (`#fb8500`)** (revised from amber-gold on 2026-05-14), Source Serif Pro for body, Inter for UI, JetBrains Mono for code/citations.
 
 ## Color tokens
 
@@ -28,14 +28,16 @@ Synthesis of [[trellis-design-guidelines]] for quick reference. Dark mode primar
 | `text-secondary` | `#7d8590` |
 | `text-muted` | `#484f58` |
 
-### Accent (amber / gold)
+### Accent (orange) — revised 2026-05-14
+
+Previous amber-gold palette retired (`#d4a72c` and its variants). Current values match the updated `.agent/design-guidelines.md`:
 
 | Token | Hex |
 |---|---|
-| `accent-primary` | `#d4a72c` |
-| `accent-primary-hover` | `#e3b341` |
-| `accent-primary-muted` | `#7d5f1a` |
-| `accent-primary-bg` | `#2d2410` |
+| `accent-primary` | `#fb8500` |
+| `accent-primary-hover` | `#ff9d2a` |
+| `accent-primary-muted` | `#8a4900` |
+| `accent-primary-bg` | `#2d1a06` |
 
 ### Semantic
 

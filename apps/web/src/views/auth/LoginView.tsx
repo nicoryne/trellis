@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { loginRequest } from '../../api/auth';
 import { useAuthStore } from '../../store/authStore';
 import { seedPersonalNotes } from '../../lib/seedPersonal';
+import { Logo } from '../../components/Logo';
+import { motion } from 'motion/react';
 import './login.css';
 
 export function LoginView() {
@@ -42,14 +44,38 @@ export function LoginView() {
     }
   }
 
+  // Stagger choreography: logo → wordmark → subtitle → title → fields → button → footer
+  const stagger = {
+    hidden: { opacity: 0, y: 10 },
+    show: (i: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: { delay: i * 0.06, duration: 0.4, ease: [0, 0, 0.2, 1] as const },
+    }),
+  };
+
   return (
     <div className="login-root">
-      <div className="login-card">
-        <span className="login-wordmark">Trellis</span>
-        <span className="login-subtitle">Legal Knowledge Management</span>
-        <h1 className="login-title">Sign in</h1>
+      <motion.div
+        className="login-card"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0, 0, 0.2, 1] }}
+      >
+        <motion.div className="login-logo-wrap" custom={0} variants={stagger} initial="hidden" animate="show">
+          <Logo size={56} />
+        </motion.div>
+        <motion.span className="login-wordmark" custom={1} variants={stagger} initial="hidden" animate="show">
+          Trellis
+        </motion.span>
+        <motion.span className="login-subtitle" custom={2} variants={stagger} initial="hidden" animate="show">
+          Legal Knowledge Management
+        </motion.span>
+        <motion.h1 className="login-title" custom={3} variants={stagger} initial="hidden" animate="show">
+          Sign in
+        </motion.h1>
 
-        <form onSubmit={handleSubmit}>
+        <motion.form onSubmit={handleSubmit} custom={4} variants={stagger} initial="hidden" animate="show">
           <div className="login-field">
             <label className="login-label" htmlFor="email">Email</label>
             <input
@@ -87,12 +113,12 @@ export function LoginView() {
           <button type="submit" className="login-btn" disabled={loading}>
             {loading ? 'Signing in...' : 'Continue'}
           </button>
-        </form>
+        </motion.form>
 
-        <div className="login-footer">
+        <motion.div className="login-footer" custom={5} variants={stagger} initial="hidden" animate="show">
           Powered by Trellis — Knowledge lives here.
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

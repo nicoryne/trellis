@@ -15,6 +15,31 @@
   backdrop-filter: blur(8px);
 }
 
+/* Hairline accent under the nav — tiny detail, reads expensive */
+.top-nav::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(var(--accent-primary-rgb), 0.0) 15%,
+    rgba(var(--accent-primary-rgb), 0.35) 50%,
+    rgba(var(--accent-primary-rgb), 0.0) 85%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.top-nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .top-nav-wordmark {
   font-family: var(--font-serif);
   font-size: 20px;
@@ -87,6 +112,7 @@
 }
 
 .side-nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -96,17 +122,32 @@
   font-size: 13px;
   font-weight: 500;
   text-decoration: none;
-  border-radius: 0;
   transition: background var(--duration-fast) var(--easing-default),
               color var(--duration-fast) var(--easing-default);
   cursor: pointer;
   border: none;
   background: none;
-  width: 100%;
   text-align: left;
   margin: 0 8px;
   width: calc(100% - 16px);
   border-radius: 6px;
+  overflow: hidden;
+}
+
+/* The motion-driven 2px orange rail slides between active items via layoutId */
+.side-nav-rail {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent-primary);
+  box-shadow: 0 0 12px rgba(var(--accent-primary-rgb), 0.4);
+}
+
+.side-nav-label {
+  position: relative;
 }
 
 .side-nav-item svg {

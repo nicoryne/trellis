@@ -72,9 +72,9 @@ These files are created once and should not be modified without coordination:
 | Ticket | Day | Priority | Status | Description |
 |---|---|---|---|---|
 | G-1 | 1 | P0 | ✓ | Auth backend + login view (`POST /api/auth/login` → JWT 24h; bcrypt 10 rounds; 3 pre-seeded accounts: Ana Mendoza / Carlos Reyes / Diana Santos at `litigator|lead|admin@acme.law`, password `demo`) |
-| G-2 | 1 | P0 | ✓ | App shell + navigation (top nav 56px + side nav 240px; Lucide icons; amber active state; ProtectedRoute wrapper) |
+| G-2 | 1 | P0 | ✓ | App shell + navigation (top nav 56px + side nav 240px; Lucide icons; orange `#fb8500` active state; ProtectedRoute wrapper) |
 | G-3 | 1 | P0 | ✓ | Express server foundation (CORS; JWT middleware; rate limit 60 req/60s in-memory; 429 `{ code: 'RATE_LIMITED' }`) |
-| G-4 | 2–3 | P0 | ✓ | Redaction backend service (`POST /api/redact`: Presidio :5001/:5002 → Gemini 2.5 Pro → preservation score; regex fallback on Presidio failure; `POST /api/publish`: embed via `text-embedding-004` → insert team_graph_nodes + edges) |
+| G-4 | 2–3 | P0 | ✓ | Redaction backend service (`POST /api/redact`: Presidio :5001/:5002 → Gemini 2.5 Pro → preservation score; regex fallback on Presidio failure; `POST /api/publish`: embed via `gemini-embedding-001` (768-dim) → insert team_graph_nodes + edges) |
 | G-5 | 3–4 | P0 | ✓ | Redaction modal UI — hero moment 1 (full-screen split pane; **5-dot preservation score** (not 0–100% bar); contentEditable right pane; publish gated by `confidence > 40 \|\| hasManualEdit`; connecting curves not implemented — intentional cost trim) |
 | G-6 | 4 | P0 | ✓ | Team graph view (read-only Cytoscape.js cose layout; click → 340px slide-in node summary panel; opacity-based search filter) |
 | G-7 | 2 | P0 | ✓ | Team graph API route (`GET /api/team-graph`; `GET /api/team-graph/nodes/:id`) |
