@@ -44,7 +44,7 @@ The retrieval and synthesis pipeline behind [[trellis|Trellis]]'s chat-with-team
 - **Low** — only 1 node above 0.75, or several below 0.70
 - **Refuse** — zero nodes above 0.75 (no answer attempted)
 
-The confidence indicator is a small pill in the chat UI: green/amber/red dot + label. Sources section is collapsed for High, expanded for Medium/Low.
+The confidence indicator is a small pill in the chat UI: green/amber/red dot + label, drawn from the **semantic** palette (`success`, `warning`, `danger`) — unaffected by the 2026-05-14 accent revision from amber-gold to orange. Sources section is collapsed for High, expanded for Medium/Low.
 
 ## Why graph expansion on top of vector search
 

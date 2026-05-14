@@ -84,8 +84,9 @@ Three routes, all require valid JWT, validated with Zod:
 - **Node types**: `insight` nodes (one per note) + entity nodes (one per unique `type:name` pair)
 - **Edge IDs**: `edge-{noteId}-entity-{type}:{name}`
 - **Deduplication**: shared entities across notes → single entity node with multiple edges in
-- **Layout**: `cose` (Compound Spring Embedder) — settles in <2s
-- **Interactivity**: search filter (non-matching nodes fade to 20% opacity), node click handlers per type, empty state CTA, one-time mount load (`[]` dep array), guarded tap handlers, memoized elements
+- **Layout (post-polish)**: switched from `cose` to **`cola`** continuous force-directed physics (`infinite: true`, `nodeSpacing: 25`, `edgeLength: 120`) for Obsidian-style organic positioning. Direct `cytoscape` instance built in `useEffect` instead of the `react-cytoscapejs` wrapper.
+- **Interactivity**: search filter (non-matching nodes fade to 20% opacity), node click handlers per type, empty state CTA, hover-to-highlight neighbors (node expands 14→18px; connected edges brighten 0.35→0.6 opacity), tap-to-open detail. (see [[cytoscape-js]])
+- **Classification hubs**: synthetic `classification`-type nodes (`isHub: true`) appear as diamond-shaped, muted-color scaffolding — one per classification value across all notes. See [[derived-edges]] (Phase 2).
 
 ## Personal seed data (`apps/web/src/lib/seedPersonal.ts`)
 

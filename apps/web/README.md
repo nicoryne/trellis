@@ -38,6 +38,6 @@ src/
 
 All UI must follow [`.agent/design-guidelines.md`](../../.agent/design-guidelines.md):
 - Dark mode primary (`#0d1117` canvas)
-- Amber/gold accents (`#d4a72c`)
+- Orange accents (`#fb8500`)
 - Source Serif Pro (body), Inter (UI), JetBrains Mono (technical)
 - No emoji in microcopy

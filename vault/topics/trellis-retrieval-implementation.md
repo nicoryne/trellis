@@ -50,7 +50,7 @@ The RETRIEVAL domain (Nicolo's vertical slice) is fully implemented and merged t
   - `lead@acme.law` — **Carlos Reyes** (role `practice_group_lead`)
   - `admin@acme.law` — **Diana Santos** (role `knowledge_admin`)
 - **Entity nodes** are created on the fly from entities found in insights (one per unique `(node_type, LOWER(title))`)
-- **Embeddings computed at seed time** using `text-embedding-004` (768 dim); stored directly in the `embedding` column
+- **Embeddings computed at seed time** using `gemini-embedding-001` (768-dim, output-dimensionality-pinned — corrected from the spec's `text-embedding-004`, which isn't exposed by the SDK) (768 dim); stored directly in the `embedding` column
 - **Entity deduplication**: case-insensitive match on `(node_type, LOWER(title))`
 - **Endpoint**: `POST /api/seed` (idempotent dev-only)
 
@@ -85,6 +85,17 @@ Streaming via Server-Sent Events. Event sequence:
 
 The `cited-nodes` event fires **first** so the frontend can trigger the query overlay while Gemini is still streaming.
 
+## Derived edges (Obsidian-style connections)
+
+Implemented in `apps/api/src/seed/deriveEdges.ts` (commit `0ceced8`), called from `seed.ts` after team-graph insertion. Four phases:
+
+1. **Shared-entity insight↔insight** — two insights mentioning ≥2 shared entities; weight `min(shared / 3, 1.0)`
+2. **Classification hubs** — synthetic `classification`-type hub nodes (one per classification value); each insight gets an `about` edge to its hub
+3. **Embedding-similarity insight↔insight** — cosine `<=>` similarity > 0.80; weight = similarity; skips pairs already linked by Phase 1
+4. **Entity co-occurrence entity↔entity** — entity pairs appearing in ≥2 insights together; weight `min(cooccurrences / 4, 1.0)`
+
+Phases 1, 3, 4 use `edge_type = 'related_to'`; Phase 2 uses `about`. Visual differentiation lives in `apps/web/src/lib/graphUtils.ts`: `mentions` solid 0.35, `about` dotted 0.15, `related_to` dashed `[4,3]` 0.25. See [[derived-edges]] for the full concept page.
+
 ## Chat view (`views/chat/ChatView.tsx` + `store/chatStore.ts`)
 
 - On `cited-nodes`: create assistant message with empty `content`, set `overlayActive = true`
@@ -93,13 +104,22 @@ The `cited-nodes` event fires **first** so the frontend can trigger the query ov
 - Auto-scroll to bottom on new messages
 - **Citation chips**: inline `[id]` markers in text are parsed into `Citation` objects; each renders as a chip that opens a node summary panel
 - **Refusal state**: when `confidence === 'refuse'`, the refusal message is shown without a sources panel
+- **Welcome state** (post-polish, commit `1c836dd`): shown when `messages.length === 0`; greets the lawyer by first name (`Welcome, ${user.displayName.split(' ')[0]}`) and offers 4 suggested queries that auto-submit:
+  - "What strategies work for cross-examining expert witnesses?"
+  - "How do we handle summary judgment motions?"
+  - "What are our deposition timeline strategies?"
+  - "How should we approach settlement negotiations?"
+- **Thinking indicator**: three animated dots render while the assistant message is streaming with empty content
+- **Per-message timestamp**: `formatTime(timestamp)` → "HH:MM" beside each message
+- **Avatars**: user shows "You" text label; assistant shows a geometric SVG icon (three interlocking diamonds)
+- **Header subtitle**: "Ask questions grounded in your firm's knowledge graph"
 
 ## Query overlay (`views/chat/QueryOverlay.tsx`)
 
 - **Implementation: canvas-based**, not Cytoscape-driven (deviation from spec). The chat-time graph is a separate visual layer rendered to a `<canvas>` with `requestAnimationFrame`.
 - **Timing**: fade-in **400ms**, hold ~**800ms**, fade-out **600ms**
 - **All nodes render at 15% opacity**; cited nodes (by ID) render at **100%** with a glow when opacity > 0.5
-- **Edges between cited nodes** illuminate in amber as their endpoint nodes light up
+- **Edges between cited nodes** illuminate in `accent-primary` (orange `#fb8500`, revised from amber-gold on 2026-05-14) as their endpoint nodes light up
 - **`prefers-reduced-motion`**: skips the rAF fade loops; sets opacity directly to 1, holds ~800ms, then collapses instantly
 - **HiDPI**: `devicePixelRatio` canvas scaling
 - **Stability fix**: `Math.random()` was originally inside the render loop causing per-frame node jitter; replaced with deterministic `stableJitter()` (see audit fixes below)

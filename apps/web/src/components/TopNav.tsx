@@ -3,6 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { logoutRequest } from '../api/auth';
+import { Logo } from './Logo';
 import './shell.css';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -23,7 +24,10 @@ export function TopNav() {
 
   return (
     <nav className="top-nav">
-      <span className="top-nav-wordmark">Trellis</span>
+      <div className="top-nav-brand">
+        <Logo size={22} />
+        <span className="top-nav-wordmark">Trellis</span>
+      </div>
       <div className="top-nav-right">
         {user && (
           <>

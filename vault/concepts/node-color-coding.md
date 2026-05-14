@@ -10,7 +10,7 @@ updated: 2026-05-12
 
 # Node color coding
 
-The palette assigned to each node type in [[trellis|Trellis]]'s graph views. Governed by a **strict rule**: no graph node color may overlap with the accent palette (gold/amber) or the semantic palette (success/warning/danger/info). This keeps **UI signals visually distinct from data**.
+The palette assigned to each node type in [[trellis|Trellis]]'s graph views. Governed by a **strict rule**: no graph node color may overlap with the accent palette (orange `#fb8500`) or the semantic palette (success/warning/danger/info). This keeps **UI signals visually distinct from data**.
 
 ## Palette (per [[trellis-design-guidelines]] §2.5)
 
@@ -30,11 +30,11 @@ The palette assigned to each node type in [[trellis|Trellis]]'s graph views. Gov
 
 - At rest: neutral `#30363d` (`border-default`).
 - On hover: brighten to `#7d8590` (`text-secondary`).
-- **Cited edges during [[query-overlay-animation|query overlay]]**: illuminate to `accent-primary` (amber). This is the **only** place an accent color appears in graph visualization — it signals "active cited path."
+- **Cited edges during [[query-overlay-animation|query overlay]]**: illuminate to `accent-primary` (orange `#fb8500`). This is the **only** place an accent color appears in graph visualization — it signals "active cited path."
 
 ## The strict rule in plain terms
 
-If a user sees gold in the graph, they should know it means *"this is part of the answer being cited right now."* Not *"this is a node type."* That separation is what makes the [[query-overlay-animation]] readable without legend.
+If a user sees orange in the graph, they should know it means *"this is part of the answer being cited right now."* Not *"this is a node type."* That separation is what makes the [[query-overlay-animation]] readable without legend.
 
 ## Implementation
 

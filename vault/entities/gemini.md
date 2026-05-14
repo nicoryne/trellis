@@ -3,9 +3,9 @@ title: Gemini (Google AI)
 type: entity
 status: active
 tags: [ai-model, llm, vendor, google]
-sources: [trellis-project-architecture, trellis-product-requirements, trellis-context-dump]
+sources: [trellis-project-architecture, trellis-product-requirements, trellis-context-dump, trellis-seed-data-analysis, trellis-implementation-plan]
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-14
 ---
 
 # Gemini
@@ -18,7 +18,7 @@ Google's frontier LLM family. Trellis MVP uses three variants plus an embedding 
 - **Gemini 2.5 Pro** — entity extraction, classification, [[redaction-pipeline|redaction Pass 2 generalization]], [[rag-query-pipeline|RAG synthesis]]. (see [[trellis-project-architecture]])
 - **Gemini 2.5 Flash** — lower-stakes/faster ops: confidence scoring, summary generation, [[insight-preservation-score]].
 - **Gemini Vision** — image-to-text for [[trellis|image capture]] (PNG/JPG/WebP up to 10MB).
-- **`text-embedding-004`** — 768-dimension embeddings stored in `vector(768)` column with HNSW + `vector_cosine_ops` in [[postgres-pgvector]].
+- **Embedding model** (as shipped): **`gemini-embedding-001`** with `outputDimensionality: 768` to match the `vector(768)` column with HNSW + `vector_cosine_ops` in [[postgres-pgvector]]. The architecture spec called for `text-embedding-004`, but that model is not exposed by the `@google/generative-ai` SDK; the implementation switched to `gemini-embedding-001` in commits `0164277` + `b522b13` and uses a type-assertion workaround because `@google/generative-ai@0.24.1` types omit the `outputDimensionality` field (the API accepts it).
 - **In V1**: cloud Gemini Pro continues to receive **only sanitized content**; on-device extraction shifts to [[gemma]].
 
 ## Role in pipelines
@@ -53,3 +53,5 @@ Trellis qualifies for the **Gemini Award**: Gemini powers extraction, redaction,
 - [[trellis-project-architecture]]
 - [[trellis-product-requirements]]
 - [[trellis-context-dump]]
+- [[trellis-seed-data-analysis]]
+- [[trellis-implementation-plan]]

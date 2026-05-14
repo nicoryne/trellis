@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, MessageSquare } from 'lucide-react';
+import { Send, PenLine } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { useChatStore } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
 import { streamChat } from '../../api/chat';
@@ -7,20 +9,11 @@ import { ChatMessageComponent } from './ChatMessage';
 import { NodeSummaryPanel } from './NodeSummaryPanel';
 import { SourcesPanel } from './SourcesPanel';
 import { QueryOverlay } from './QueryOverlay';
+import { Logo } from '../../components/Logo';
 import './chat.css';
 
 /**
- * ChatView — the main "Chat with Team Brain" page.
- * Hero Moment 2 (design guidelines §8.2).
- *
- * Features:
- *   - Welcome state with suggested questions
- *   - Streaming SSE responses with thinking animation
- *   - Inline citation chips → node summary panel
- *   - Confidence badge
- *   - Query overlay animation trigger
- *   - Refusal state
- *   - Message history preserved during session
+ * ChatView — Hero Moment 2 (design guidelines §8.2).
  */
 
 const SUGGESTED_QUERIES = [
@@ -38,13 +31,16 @@ export const ChatView: React.FC = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
+  const navigate = useNavigate();
 
   const {
     messages,
     isStreaming,
+    isPending,
     citedNodeIds,
     overlayActive,
     addUserMessage,
+    setPending,
     startStreaming,
     appendToken,
     finishStreaming,
@@ -63,17 +59,19 @@ export const ChatView: React.FC = () => {
 
   const handleSubmit = useCallback(async (overrideQuery?: string) => {
     const query = (overrideQuery ?? input).trim();
-    if (!query || isStreaming) return;
+    if (!query || isStreaming || isPending) return;
 
     if (!overrideQuery) setInput('');
     addUserMessage(query);
+    // Dim chat immediately on submit (design-guidelines §8.3 step 2).
+    setPending(true);
 
     try {
       await streamChat(query, token, {
         onCitedNodes: (nodeIds, confidence) => {
           startStreaming(nodeIds, confidence);
           // Expand sources by default for medium/low confidence
-          setSourcesExpanded(confidence !== 'high');
+          setSourcesExpanded(confidence === 'medium' || confidence === 'low');
         },
         onToken: (text) => {
           appendToken('', text);
@@ -89,8 +87,10 @@ export const ChatView: React.FC = () => {
     } catch (err) {
       console.error('[chat] Failed to send query:', err);
       finishStreaming('', 'refuse', 0);
+    } finally {
+      setPending(false);
     }
-  }, [input, isStreaming, token, addUserMessage, startStreaming, appendToken, finishStreaming]);
+  }, [input, isStreaming, isPending, token, addUserMessage, setPending, startStreaming, appendToken, finishStreaming]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -99,10 +99,24 @@ export const ChatView: React.FC = () => {
     }
   };
 
-  const canSend = input.trim() && !isStreaming;
+  // Auto-grow textarea up to 4 lines
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  };
+
+  const canSend = input.trim() && !isStreaming && !isPending;
+  const lastMsg = messages[messages.length - 1];
+  const isLastAssistantRefusal =
+    lastMsg?.role === 'assistant' && !isStreaming && lastMsg.confidence === 'refuse';
+  // Dim chat from submission through overlay reveal
+  const dimChat = overlayActive || isPending;
 
   return (
-    <div className={`chat-root${overlayActive ? ' overlay-active' : ''}`}>
+    <div className="chat-root">
+      <div className={`chat-content${dimChat ? ' chat-content--dimmed' : ''}`}>
       {/* Header */}
       <div className="chat-header">
         <h1>Team Brain</h1>
@@ -115,24 +129,24 @@ export const ChatView: React.FC = () => {
       <div className="chat-messages">
         {messages.length === 0 && (
           <div className="chat-welcome">
-            <div className="chat-welcome-icon">
-              <MessageSquare size={24} />
+            <div className="chat-welcome-logo">
+              <Logo size={56} />
             </div>
             <span className="chat-welcome-title">
               {user ? `Welcome, ${user.displayName.split(' ')[0]}` : 'Welcome to Team Brain'}
             </span>
             <span className="chat-welcome-desc">
-              Ask a question and receive answers cited directly from your firm's published insights. 
+              Ask a question and receive answers cited directly from your firm's published insights.
               Every response is grounded — no hallucination.
             </span>
 
-            {/* Suggested queries */}
             <div className="chat-welcome-suggestions">
               {SUGGESTED_QUERIES.map((q) => (
                 <button
                   key={q}
                   className="chat-suggestion"
                   onClick={() => handleSubmit(q)}
+                  disabled={isStreaming || isPending}
                 >
                   {q}
                 </button>
@@ -149,10 +163,11 @@ export const ChatView: React.FC = () => {
               onCitationClick={setSelectedNodeId}
               citedNodeIds={citedNodeIds}
             />
-            {/* Sources panel after the last assistant message */}
+            {/* Sources panel — only after the latest assistant message, never on refusals */}
             {msg.role === 'assistant' &&
               !isStreaming &&
               msg === messages[messages.length - 1] &&
+              msg.confidence !== 'refuse' &&
               citedNodeIds.length > 0 && (
                 <SourcesPanel
                   citedNodeIds={citedNodeIds}
@@ -163,17 +178,32 @@ export const ChatView: React.FC = () => {
           </React.Fragment>
         ))}
 
-        {/* Thinking indicator — shows when streaming starts but no content yet */}
-        {isStreaming && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && messages[messages.length - 1]?.content === '' && (
+        {/* Refusal CTA — subtle suggestion to capture related personal note (§8.2) */}
+        {isLastAssistantRefusal && (
+          <motion.div
+            className="chat-refusal-cta"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.35 }}
+          >
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={() => navigate('/capture')}
+            >
+              <PenLine size={14} aria-hidden />
+              Capture your thinking on this
+            </button>
+          </motion.div>
+        )}
+
+        {/* Thinking indicator — shows while pending OR streaming with no content yet */}
+        {(isPending || (isStreaming && lastMsg?.role === 'assistant' && lastMsg.content === '')) && (
           <div className="chat-thinking">
-            <div className="chat-avatar chat-avatar--assistant">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                <path d="M2 17l10 5 10-5"/>
-                <path d="M2 12l10 5 10-5"/>
-              </svg>
+            <div className="chat-avatar chat-avatar--assistant" aria-hidden>
+              <Logo size={20} alt="" />
             </div>
-            <div className="thinking-dots">
+            <div className="thinking-dots" aria-label="Thinking">
               <span className="thinking-dot" />
               <span className="thinking-dot" />
               <span className="thinking-dot" />
@@ -190,32 +220,34 @@ export const ChatView: React.FC = () => {
           <textarea
             ref={inputRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="Ask the firm..."
-            disabled={isStreaming}
+            disabled={isStreaming || isPending}
             rows={1}
             className="chat-input"
           />
-          <button
+          <motion.button
             onClick={() => handleSubmit()}
             disabled={!canSend}
             aria-label="Send message"
             className={`chat-send-btn ${canSend ? 'chat-send-btn--active' : 'chat-send-btn--disabled'}`}
+            whileTap={canSend ? { scale: 0.94 } : undefined}
+            transition={{ type: 'spring', stiffness: 420, damping: 22 }}
           >
             <Send size={18} />
-          </button>
+          </motion.button>
         </div>
       </div>
+      </div>
 
-      {/* Query overlay animation */}
+      {/* Sibling of .chat-content — escapes the dim cascade */}
       <QueryOverlay
         active={overlayActive}
         citedNodeIds={citedNodeIds}
         onDismiss={() => setOverlayActive(false)}
       />
 
-      {/* Node summary slide-in panel */}
       <NodeSummaryPanel
         nodeId={selectedNodeId}
         onClose={() => setSelectedNodeId(null)}

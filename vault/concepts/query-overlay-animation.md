@@ -54,7 +54,7 @@ This is Hero Moment 3 of three. The other two are the publish-with-redaction mod
 - **Renderer**: a `<canvas>` element with `requestAnimationFrame`, **not Cytoscape** — the chat-time graph is a separate visual layer from the persistent team graph view. Deviation from "team graph fades in" if read literally; the perceptual effect is the same.
 - **Trigger**: SSE `cited-nodes` event (fires before the first `token` event)
 - **Timing**: fade-in **400ms**, hold **~800ms**, fade-out **600ms**
-- **Pulse implementation**: not a per-node scale wave; instead, all nodes render at **15% opacity** simultaneously, cited nodes render at **100%** with a glow effect when opacity > 0.5, and edges between cited nodes illuminate amber as their endpoints light up
+- **Pulse implementation**: not a per-node scale wave; instead, all nodes render at **15% opacity** simultaneously, cited nodes render at **100%** with a glow effect when opacity > 0.5, and edges between cited nodes illuminate to `accent-primary` (orange `#fb8500`) as their endpoints light up
 - **HiDPI**: canvas scaled by `devicePixelRatio`
 - **Reduced motion**: rAF loops skipped; opacity set directly to 1, holds ~800ms, then collapses instantly
 - **Determinism fix**: an early implementation had `Math.random()` inside the render loop causing per-frame jitter; replaced with `stableJitter()` (see [[trellis-retrieval-implementation|audit fixes]])

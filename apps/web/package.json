@@ -17,6 +17,7 @@
     "@types/cytoscape": "^3.21.9",
     "cytoscape": "^3.33.3",
     "cytoscape-cola": "^2.5.1",
+    "cytoscape-fcose": "^2.2.0",
     "idb": "^8.0.3",
     "lucide-react": "^1.14.0",
     "react": "^19.2.6",

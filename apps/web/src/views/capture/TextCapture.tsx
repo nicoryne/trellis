@@ -10,10 +10,10 @@ const ENTITY_COLORS: Record<string, string> = {
   party: '#ef476f',
   lawyer: '#118ab2',
   judge: '#073b4c',
-  witness: '#ff9f1c',
+  witness: '#ffd60a',
   concept: '#8338ec',
   precedent: '#3a86ff',
-  statute: '#fb5607',
+  statute: '#d62828',
 };
 
 export default function TextCapture() {

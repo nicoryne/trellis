@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    Trellis · Global Application Styles
-   Premium legal-grade UI: dark, institutional, amber-accented.
+   Premium legal-grade UI: dark, institutional, orange-accented.
    Follows design-guidelines.md §2–§9.
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -231,7 +231,7 @@
 
 .btn--primary:hover:not(:disabled) {
   background: var(--accent-primary-hover);
-  box-shadow: 0 0 20px rgba(212, 167, 44, 0.15);
+  box-shadow: 0 0 20px rgba(var(--accent-primary-rgb), 0.18);
 }
 
 .btn--secondary {
@@ -460,6 +460,12 @@
   justify-content: center;
   color: var(--text-muted);
   margin-bottom: 8px;
+}
+
+.empty-state-logo {
+  opacity: 0.5;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 4px 18px rgba(var(--accent-primary-rgb), 0.2));
 }
 
 .empty-state-title {
