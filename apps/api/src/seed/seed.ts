@@ -20,6 +20,7 @@ import pool from '../db/pool';
 import { insertNode, insertEdge, getNodeCount } from '../db/queries';
 import { generateEmbedding } from '../services/embedding';
 import { seedInsights } from './insights';
+import { deriveAllEdges } from './deriveEdges';
 
 const BCRYPT_ROUNDS = 10;
 
@@ -146,12 +147,19 @@ export async function runSeed(): Promise<{ users: number; nodes: number }> {
   const contributorId = await seedUsers();
   await seedTeamGraph(contributorId);
 
+  // Derive Obsidian-style connections (Phase 1, 3, 4)
+  console.log('[seed] Deriving Obsidian-style graph connections...');
+  const derived = await deriveAllEdges();
+  console.log(`[seed] Derived edges: ${derived.sharedEntity} shared-entity, ${derived.embeddingSimilarity} embedding-similarity, ${derived.entityCooccurrence} co-occurrence`);
+
   const userCount = await pool.query('SELECT COUNT(*)::int AS count FROM users');
   const nodeCount = await getNodeCount();
+  const edgeCount = await pool.query('SELECT COUNT(*)::int AS count FROM team_graph_edges');
 
   console.log('[seed] Seed complete.');
   console.log(`[seed] Users: ${userCount.rows[0].count}`);
   console.log(`[seed] Team graph nodes: ${nodeCount}`);
+  console.log(`[seed] Team graph edges: ${edgeCount.rows[0].count}`);
 
   return { users: userCount.rows[0].count, nodes: nodeCount };
 }

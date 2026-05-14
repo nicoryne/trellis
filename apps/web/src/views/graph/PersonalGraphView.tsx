@@ -66,6 +66,22 @@ export default function PersonalGraphView() {
             'overlay-opacity': 0,
           } as any,
         },
+        // Phase 2: Classification hub nodes — larger, diamond, muted
+        {
+          selector: 'node[?isHub]',
+          style: {
+            shape: 'diamond',
+            width: 22,
+            height: 22,
+            'background-opacity': 0.4,
+            'shadow-opacity': 0.3,
+            'shadow-blur': 8,
+            'font-size': 10,
+            'font-weight': 500,
+            'text-transform': 'uppercase',
+            color: '#484f58',
+          } as any,
+        },
         {
           selector: 'node:active, node:grabbed',
           style: {
@@ -89,6 +105,7 @@ export default function PersonalGraphView() {
             color: '#e6edf3',
           } as any,
         },
+        // Default edges (mentions)
         {
           selector: 'edge',
           style: {
@@ -97,6 +114,27 @@ export default function PersonalGraphView() {
             'curve-style': 'bezier',
             opacity: 0.35,
             'overlay-opacity': 0,
+          } as any,
+        },
+        // Phase 1/3/4: Derived related_to edges — dashed, slightly brighter
+        {
+          selector: 'edge[edgeType="related_to"]',
+          style: {
+            'line-style': 'dashed',
+            'line-color': '#30363d',
+            'line-dash-pattern': [4, 3],
+            width: 0.5,
+            opacity: 0.25,
+          } as any,
+        },
+        // Phase 2: About edges (note → classification hub) — dotted, very subtle
+        {
+          selector: 'edge[edgeType="about"]',
+          style: {
+            'line-style': 'dotted',
+            'line-color': '#21262d',
+            width: 0.4,
+            opacity: 0.15,
           } as any,
         },
         {

@@ -49,11 +49,16 @@ export function TeamGraphView() {
     if (!containerRef.current || !graph) return;
 
     const elements = [
-      ...graph.nodes.map((n) => ({
-        data: { id: n.id, label: n.title, nodeType: n.nodeType },
+      ...graph.nodes.map((n: any) => ({
+        data: { id: n.id, label: n.title, nodeType: n.nodeType ?? n.node_type },
       })),
-      ...graph.edges.map((e) => ({
-        data: { id: e.id, source: e.sourceNodeId, target: e.targetNodeId, edgeType: e.edgeType },
+      ...graph.edges.map((e: any) => ({
+        data: {
+          id: e.id,
+          source: e.sourceNodeId ?? e.source_node_id,
+          target: e.targetNodeId ?? e.target_node_id,
+          edgeType: e.edgeType ?? e.edge_type,
+        },
       })),
     ];
 
@@ -122,6 +127,17 @@ export function TeamGraphView() {
             'curve-style': 'bezier',
             opacity: 0.35,
             'overlay-opacity': 0,
+          } as any,
+        },
+        // Derived related_to edges — dashed, slightly brighter
+        {
+          selector: 'edge[edgeType="related_to"]',
+          style: {
+            'line-style': 'dashed',
+            'line-color': '#30363d',
+            'line-dash-pattern': [4, 3],
+            width: 0.5,
+            opacity: 0.25,
           } as any,
         },
         {
