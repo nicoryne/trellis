@@ -1,15 +1,21 @@
 // apps/web/src/views/team/TeamGraphView.tsx
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import cytoscape, { Core } from 'cytoscape';
-import cola from 'cytoscape-cola';
+import fcose from 'cytoscape-fcose';
 import { useAuthStore } from '../../store/authStore';
 import { fetchTeamGraph } from '../../api/teamGraph';
 import type { TeamGraph } from '../../types/index';
 import { NodeSummaryPanel } from './NodeSummaryPanel';
+import { GraphZoomControl } from '../../components/GraphZoomControl';
 import './team.css';
 
-// Register cola layout extension
-cytoscape.use(cola);
+// Register fcose once
+if (!(cytoscape as any).__fcoseRegistered) {
+  cytoscape.use(fcose);
+  (cytoscape as any).__fcoseRegistered = true;
+}
+
+const LABEL_ZOOM_THRESHOLD = 0.75;
 
 const NODE_COLORS: Record<string, string> = {
   insight: '#9d4edd',
@@ -27,12 +33,14 @@ export function TeamGraphView() {
   const token = useAuthStore((s) => s.token);
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
+  const baseZoomRef = useRef<number>(1);
 
   const [graph, setGraph] = useState<TeamGraph | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [zoomPercent, setZoomPercent] = useState(100);
 
   // Fetch graph data
   useEffect(() => {
@@ -43,6 +51,42 @@ export function TeamGraphView() {
       if (result.data) setGraph(result.data);
     });
   }, [token]);
+
+  const refreshLabelVisibility = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const base = baseZoomRef.current || 1;
+    const showAll = cy.zoom() / base >= LABEL_ZOOM_THRESHOLD;
+    cy.nodes().forEach((n) => {
+      const forced = n.hasClass('cy-hover') || n.selected();
+      n.style('text-opacity', forced || showAll ? 1 : 0);
+    });
+  }, []);
+
+  const applyZoomPercent = useCallback((pct: number) => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const base = baseZoomRef.current || 1;
+    const target = base * (pct / 100);
+    cy.zoom({
+      level: target,
+      renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 },
+    });
+  }, []);
+
+  const handleZoomChange = useCallback((pct: number) => {
+    setZoomPercent(pct);
+    applyZoomPercent(pct);
+  }, [applyZoomPercent]);
+
+  const handleZoomReset = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.fit(undefined, 60);
+    baseZoomRef.current = cy.zoom();
+    setZoomPercent(100);
+    refreshLabelVisibility();
+  }, [refreshLabelVisibility]);
 
   // Build Cytoscape instance
   useEffect(() => {
@@ -86,14 +130,16 @@ export function TeamGraphView() {
             'text-outline-color': '#0d1117',
             'text-outline-width': 2,
             'text-outline-opacity': 0.8,
+            'text-opacity': 1,
             'border-width': 0,
-            // Obsidian-style glow
             'shadow-blur': 12,
             'shadow-color': (el: cytoscape.NodeSingular) => NODE_COLORS[el.data('nodeType')] ?? '#7d8590',
             'shadow-offset-x': 0,
             'shadow-offset-y': 0,
             'shadow-opacity': 0.6,
             'overlay-opacity': 0,
+            'transition-property': 'text-opacity',
+            'transition-duration': 180,
           } as any,
         },
         {
@@ -129,7 +175,6 @@ export function TeamGraphView() {
             'overlay-opacity': 0,
           } as any,
         },
-        // Derived related_to edges — dashed, slightly brighter
         {
           selector: 'edge[edgeType="related_to"]',
           style: {
@@ -149,30 +194,56 @@ export function TeamGraphView() {
           },
         },
       ],
-      // No layout yet — we run cola separately
       layout: { name: 'preset' },
       userZoomingEnabled: true,
       userPanningEnabled: true,
+      wheelSensitivity: 0.25,
     });
 
-    // Run continuous cola force-directed layout (Obsidian-style live physics)
+    cyRef.current = cy;
+
+    // fcose with gravity — all nodes pull toward a common center
     const layout = cy.layout({
-      name: 'cola',
-      infinite: true,       // Never stops — continuous simulation
-      fit: false,            // Don't auto-fit, let the user pan/zoom
-      animate: true,         // Animate node positions
-      randomize: true,       // Random initial positions
-      maxSimulationTime: 0,  // Run forever
-      ungrabifyWhileSimulating: false, // Allow dragging during simulation
-      nodeSpacing: 25,       // Space between nodes
-      edgeLength: 120,       // Ideal edge length
-      padding: 40,
+      name: 'fcose',
+      quality: 'default',
+      randomize: true,
+      animate: true,
+      animationDuration: 900,
+      animationEasing: 'ease-out',
+      fit: true,
+      padding: 60,
+      nodeDimensionsIncludeLabels: false,
+      gravity: 0.35,
+      gravityRange: 3.8,
+      gravityCompound: 1.0,
+      gravityRangeCompound: 1.5,
+      idealEdgeLength: 75,
+      nodeRepulsion: 4500,
+      edgeElasticity: 0.45,
+      nestingFactor: 0.1,
+      numIter: 2500,
+      tile: true,
+      tilingPaddingVertical: 8,
+      tilingPaddingHorizontal: 8,
+      packComponents: true,
     } as any);
     layout.run();
 
-    // Hover glow — Cytoscape uses canvas, CSS :hover doesn't apply
+    const onLayoutStop = () => {
+      cy.fit(undefined, 60);
+      const base = cy.zoom();
+      baseZoomRef.current = base;
+      cy.minZoom(base * 0.2);
+      cy.maxZoom(base * 1.5);
+      setZoomPercent(100);
+      refreshLabelVisibility();
+    };
+    cy.one('layoutstop', onLayoutStop);
+
+    // Hover: show full styling + always show this node's label
     cy.on('mouseover', 'node', (e) => {
       const node = e.target;
+      node.addClass('cy-hover');
       node.style({
         width: 18,
         height: 18,
@@ -180,13 +251,17 @@ export function TeamGraphView() {
         'shadow-opacity': 0.85,
         'background-opacity': 1,
         color: '#e6edf3',
+        'text-opacity': 1,
       });
       node.connectedEdges().style({ opacity: 0.6, 'line-color': '#30363d', width: 1 });
     });
 
     cy.on('mouseout', 'node', (e) => {
       const node = e.target;
+      node.removeClass('cy-hover');
       if (!node.selected()) {
+        const base = baseZoomRef.current || 1;
+        const showLabel = cy.zoom() / base >= LABEL_ZOOM_THRESHOLD;
         node.style({
           width: 14,
           height: 14,
@@ -194,6 +269,7 @@ export function TeamGraphView() {
           'shadow-opacity': 0.6,
           'background-opacity': 0.9,
           color: '#8b949e',
+          'text-opacity': showLabel ? 1 : 0,
         });
         node.connectedEdges().style({ opacity: 0.35, 'line-color': '#21262d', width: 0.75 });
       }
@@ -207,12 +283,21 @@ export function TeamGraphView() {
       if (e.target === cy) setSelectedNodeId(null);
     });
 
-    // Center the graph after initial positions settle
-    setTimeout(() => cy.fit(undefined, 60), 1500);
+    // Sync cy zoom → slider state
+    cy.on('zoom', () => {
+      const base = baseZoomRef.current || 1;
+      const pct = Math.round((cy.zoom() / base) * 100);
+      const clamped = Math.max(20, Math.min(150, pct));
+      setZoomPercent((prev) => (Math.abs(clamped - prev) >= 1 ? clamped : prev));
+      refreshLabelVisibility();
+    });
 
-    cyRef.current = cy;
-    return () => { layout.stop(); cy.destroy(); cyRef.current = null; };
-  }, [graph]);
+    return () => {
+      layout.stop();
+      cy.destroy();
+      cyRef.current = null;
+    };
+  }, [graph, refreshLabelVisibility]);
 
   // Search filter
   useEffect(() => {
@@ -266,6 +351,13 @@ export function TeamGraphView() {
           </div>
         )}
         <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+        {!loading && graph && graph.nodes.length > 0 && (
+          <GraphZoomControl
+            zoomPercent={zoomPercent}
+            onChange={handleZoomChange}
+            onReset={handleZoomReset}
+          />
+        )}
       </div>
 
       <NodeSummaryPanel

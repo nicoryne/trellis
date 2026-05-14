@@ -4,12 +4,14 @@ import type { ChatMessage, ConfidenceLevel } from '../types';
 interface ChatState {
   messages: ChatMessage[];
   isStreaming: boolean;
+  isPending: boolean; // Submitted; awaiting first response event (cited-nodes or done)
   citedNodeIds: string[];
   confidence: ConfidenceLevel | null;
   overlayActive: boolean;
 
   // Actions
   addUserMessage: (content: string) => string;
+  setPending: (pending: boolean) => void;
   startStreaming: (citedNodeIds: string[], confidence: ConfidenceLevel) => void;
   appendToken: (messageId: string, text: string) => void;
   finishStreaming: (messageId: string, confidence: ConfidenceLevel, sourceCount: number) => void;
@@ -26,9 +28,12 @@ function generateId(): string {
 export const useChatStore = create<ChatState>((set) => ({
   messages: [],
   isStreaming: false,
+  isPending: false,
   citedNodeIds: [],
   confidence: null,
   overlayActive: false,
+
+  setPending: (pending: boolean) => set({ isPending: pending }),
 
   addUserMessage: (content: string) => {
     const id = generateId();
@@ -55,9 +60,12 @@ export const useChatStore = create<ChatState>((set) => ({
     set((state) => ({
       messages: [...state.messages, message],
       isStreaming: true,
+      isPending: false,
       citedNodeIds,
       confidence,
-      overlayActive: true,
+      // Skip the overlay for refusals or empty-citation responses — the hero animation
+      // requires actual nodes to be meaningful (design-guidelines §8.3).
+      overlayActive: confidence !== 'refuse' && citedNodeIds.length > 0,
     }));
   },
 
@@ -81,11 +89,19 @@ export const useChatStore = create<ChatState>((set) => ({
         return m;
       }),
       isStreaming: false,
+      isPending: false,
       overlayActive: false,
     }));
   },
 
   setOverlayActive: (active: boolean) => set({ overlayActive: active }),
   clearMessages: () =>
-    set({ messages: [], isStreaming: false, citedNodeIds: [], confidence: null, overlayActive: false }),
+    set({
+      messages: [],
+      isStreaming: false,
+      isPending: false,
+      citedNodeIds: [],
+      confidence: null,
+      overlayActive: false,
+    }),
 }));
