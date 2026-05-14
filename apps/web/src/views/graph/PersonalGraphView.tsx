@@ -170,6 +170,15 @@ export default function PersonalGraphView() {
           } as any,
         },
         {
+          selector: 'edge[edgeType="linked_to"]',
+          style: {
+            'line-style': 'solid',
+            'line-color': '#9d4edd',
+            width: 1.2,
+            opacity: 0.7,
+          } as any,
+        },
+        {
           selector: 'edge:selected',
           style: {
             'line-color': EDGE_COLOR_HOVER,
@@ -190,9 +199,7 @@ export default function PersonalGraphView() {
       name: 'fcose',
       quality: 'default',
       randomize: true,
-      animate: true,
-      animationDuration: 900,
-      animationEasing: 'ease-out',
+      animate: false,
       fit: true,
       padding: 60,
       nodeDimensionsIncludeLabels: false,

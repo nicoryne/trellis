@@ -156,6 +156,21 @@ export function notesToCytoscapeElements(notes: PersonalNote[]): CytoscapeElemen
     }
   }
 
+  // Phase 1b: Author-stated [[wikilink]] edges (visually distinct from inferred related_to)
+  for (const note of notes) {
+    for (const link of note.links ?? []) {
+      if (!link.targetNoteId) continue;
+      elements.push({
+        data: {
+          id: `linked-${note.id}-${link.targetNoteId}`,
+          source: note.id,
+          target: link.targetNoteId,
+          edgeType: 'linked_to',
+        },
+      });
+    }
+  }
+
   // Phase 2: Classification hub nodes
   for (const [cls, noteIdList] of classificationNotes.entries()) {
     if (noteIdList.length < 1) continue; // Only show hubs with at least 1 note

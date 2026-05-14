@@ -3,6 +3,7 @@ import { PenLine, Mic, Upload } from 'lucide-react';
 import TextCapture from './TextCapture';
 import AudioCapture from './AudioCapture';
 import ImageCapture from './ImageCapture';
+import './organize-panel.css';
 
 type Tab = 'write' | 'record' | 'upload';
 

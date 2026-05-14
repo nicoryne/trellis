@@ -2,165 +2,203 @@ import { useEffect, useRef, useState } from 'react';
 import { useNoteStore } from '../../store/noteStore';
 import { useAuthStore } from '../../store/authStore';
 import { organizeNote } from '../../api/client';
-import { RedactionModal } from '../publish/RedactionModal';
+import { OrganizePanel } from './OrganizePanel';
+import { NotePreview } from './NotePreview';
+import { BacklinksPanel } from './BacklinksPanel';
 import type { NoteClassification } from '../../types/index';
 
-const ENTITY_COLORS: Record<string, string> = {
-  matter: '#06d6a0',
-  party: '#ef476f',
-  lawyer: '#118ab2',
-  judge: '#073b4c',
-  witness: '#ffd60a',
-  concept: '#8338ec',
-  precedent: '#3a86ff',
-  statute: '#d62828',
-};
+const ORGANIZE_MIN_CHARS = 20;
+const SAVE_DEBOUNCE_MS = 400;
+const PANEL_COLLAPSED_KEY = 'organize-panel-collapsed';
 
 export default function TextCapture() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [isOrganizing, setIsOrganizing] = useState(false);
   const [organizeError, setOrganizeError] = useState<string | null>(null);
-  const [showRedaction, setShowRedaction] = useState(false);
-  const { saveNote, setActiveNote, updateNoteOrganization, removeEntity, notes, activeNoteId } = useNoteStore();
-  const token = useAuthStore((s) => s.token);
+  const [lastOrganizedAt, setLastOrganizedAt] = useState<number | null>(null);
+  const [suggestions, setSuggestions] = useState<{
+    classification?: NoteClassification;
+    isPrivileged?: boolean;
+  }>({});
+  const [panelCollapsed, setPanelCollapsed] = useState<boolean>(
+    () => localStorage.getItem(PANEL_COLLAPSED_KEY) === '1'
+  );
+
+  const {
+    saveNote, setActiveNote, applyAiOrganize, setClassification, setPrivilege, notes, activeNoteId,
+  } = useNoteStore();
+  const token = useAuthStore(s => s.token);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noteIdRef = useRef<string | null>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
-  const activeNote = notes.find(n => n.id === activeNoteId);
+  const activeNote = notes.find(n => n.id === activeNoteId) ?? null;
 
-  async function performSave(currentTitle: string, currentBody: string) {
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (activeNoteId && activeNote) {
+      setTitle(activeNote.title);
+      setBody(activeNote.body);
+      noteIdRef.current = activeNote.id;
+    } else {
+      setTitle('');
+      setBody('');
+      noteIdRef.current = null;
+    }
+    setSuggestions({});
+    setOrganizeError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeNoteId]);
+
+  useEffect(
+    () => () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    },
+    []
+  );
+
+  function togglePanel() {
+    setPanelCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem(PANEL_COLLAPSED_KEY, next ? '1' : '0');
+      return next;
+    });
+  }
+
+  async function persist(currentTitle: string, currentBody: string) {
     const data = {
       title: currentTitle,
       body: currentBody,
       contentType: 'text' as const,
-      extractedEntities: [],
-      classification: 'observation' as NoteClassification,
-      isPrivileged: false,
-      isPublished: false,
+      extractedEntities: activeNote?.extractedEntities ?? [],
+      classification: (activeNote?.classification ?? 'observation') as NoteClassification,
+      isPrivileged: activeNote?.isPrivileged ?? false,
+      isPublished: activeNote?.isPublished ?? false,
+      folderId: activeNote?.folderId,
+      organizeProvenance: activeNote?.organizeProvenance,
+      dismissedEntityKeys: activeNote?.dismissedEntityKeys,
     };
     const note = await saveNote(data, noteIdRef.current ?? undefined);
     if (!noteIdRef.current) {
       noteIdRef.current = note.id;
       setActiveNote(note.id);
     }
-
-    if (currentBody.trim().length > 20) {
-      setIsOrganizing(true);
-      setOrganizeError(null);
-      const response = await organizeNote(currentBody, token ?? '');
-      setIsOrganizing(false);
-      if (response.data) {
-        await updateNoteOrganization(note.id, response.data);
-      } else if (response.error) {
-        setOrganizeError(response.error.message);
-      }
-    }
   }
 
   function scheduleSave(currentTitle: string, currentBody: string) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => performSave(currentTitle, currentBody), 500);
+    debounceRef.current = setTimeout(() => persist(currentTitle, currentBody), SAVE_DEBOUNCE_MS);
   }
 
-  useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, []);
+  async function handleOrganize() {
+    if (!noteIdRef.current) await persist(title, body);
+    const id = noteIdRef.current;
+    if (!id) return;
+    if (body.trim().length < ORGANIZE_MIN_CHARS) return;
+    setIsOrganizing(true);
+    setOrganizeError(null);
+    const resp = await organizeNote(body, token ?? '');
+    setIsOrganizing(false);
+    if (resp.error) {
+      setOrganizeError(resp.error.message);
+      return;
+    }
+    if (resp.data) {
+      const { suggestions: s } = await applyAiOrganize(id, resp.data);
+      setSuggestions(s);
+      setLastOrganizedAt(Date.now());
+    }
+  }
+
+  function insertLinkLabel(label: string) {
+    const el = bodyRef.current;
+    const insertion = `[[${label}]]`;
+    if (!el) {
+      const next = `${body}${body && !body.endsWith(' ') ? ' ' : ''}${insertion}`;
+      setBody(next);
+      scheduleSave(title, next);
+      return;
+    }
+    const start = el.selectionStart ?? body.length;
+    const end = el.selectionEnd ?? body.length;
+    const next = body.slice(0, start) + insertion + body.slice(end);
+    setBody(next);
+    scheduleSave(title, next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + insertion.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
+
+  async function acceptClassificationSuggestion() {
+    if (!activeNote || !suggestions.classification) return;
+    await setClassification(activeNote.id, suggestions.classification, 'user');
+    setSuggestions(s => ({ ...s, classification: undefined }));
+  }
+  function dismissClassificationSuggestion() {
+    setSuggestions(s => ({ ...s, classification: undefined }));
+  }
+  async function acceptPrivilegeSuggestion() {
+    if (!activeNote || suggestions.isPrivileged === undefined) return;
+    await setPrivilege(activeNote.id, suggestions.isPrivileged, 'user');
+    setSuggestions(s => ({ ...s, isPrivileged: undefined }));
+  }
+  function dismissPrivilegeSuggestion() {
+    setSuggestions(s => ({ ...s, isPrivileged: undefined }));
+  }
 
   return (
-    <div className="editor-container">
-      <input
-        autoFocus
-        type="text"
-        placeholder="Note title"
-        value={title}
-        onChange={e => { setTitle(e.target.value); scheduleSave(e.target.value, body); }}
-        className="editor-title"
-      />
+    <div className="capture-layout">
+      <div className="capture-main">
+        <div className="editor-container">
+          <input
+            autoFocus
+            type="text"
+            placeholder="Note title"
+            value={title}
+            onChange={e => {
+              setTitle(e.target.value);
+              scheduleSave(e.target.value, body);
+            }}
+            className="editor-title"
+          />
 
-      <textarea
-        placeholder="Start writing your observation, strategy, or lesson learned..."
-        value={body}
-        onChange={e => { setBody(e.target.value); scheduleSave(title, e.target.value); }}
-        className="editor-body"
-      />
+          <textarea
+            ref={bodyRef}
+            placeholder="Start writing — use [[Note Title]] to link to other notes."
+            value={body}
+            onChange={e => {
+              setBody(e.target.value);
+              scheduleSave(title, e.target.value);
+            }}
+            className="editor-body"
+          />
 
-      {activeNote && activeNote.extractedEntities.length > 0 && (
-        <div className="entity-chips">
-          {activeNote.extractedEntities.map(entity => (
-            <span key={entity.id} className="entity-chip">
-              <span
-                className="entity-chip-dot"
-                style={{ backgroundColor: ENTITY_COLORS[entity.type] ?? 'var(--text-muted)' }}
-              />
-              <span style={{ color: ENTITY_COLORS[entity.type] ?? 'var(--text-primary)' }}>
-                {entity.name}
-              </span>
-              <button
-                type="button"
-                onClick={() => removeEntity(activeNote.id, entity.id)}
-                aria-label={`Remove entity ${entity.name}`}
-                className="entity-chip-remove"
-              >
-                ×
-              </button>
-            </span>
-          ))}
+          <h4 className="preview-heading">Preview</h4>
+          <NotePreview body={body} sourceNoteId={activeNote?.id ?? null} />
+
+          <BacklinksPanel activeNoteId={activeNote?.id ?? null} />
         </div>
-      )}
-
-      {activeNote?.isPrivileged && (
-        <div className="status-badge status-badge--privilege" style={{ marginTop: 16 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          Attorney-client privileged content detected
-        </div>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 20 }}>
-        {/* Publish to team graph button — visible when note is saved and not already published */}
-        {activeNote && !activeNote.isPublished && activeNote.body.trim().length > 0 && (
-          <button onClick={() => setShowRedaction(true)} className="btn btn--primary">
-            Publish to team graph
-          </button>
-        )}
-
-        {activeNote?.isPublished && (
-          <span className="status-badge status-badge--published">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            Published
-          </span>
-        )}
-
-        {isOrganizing && (
-          <span className="status-badge status-badge--organizing" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <span className="spinner" />
-            Organizing...
-          </span>
-        )}
       </div>
 
-      {organizeError && (
-        <div className="error-inline" style={{ marginTop: 12 }}>
-          <span className="error-inline-text">Organization failed</span>
-          <button onClick={() => performSave(title, body)} className="btn btn--danger-text">
-            Retry
-          </button>
-        </div>
-      )}
-
-      {/* Redaction modal */}
-      {showRedaction && activeNote && (
-        <RedactionModal
-          note={activeNote}
-          onClose={() => setShowRedaction(false)}
-          onPublished={(nodeId) => {
-            // Mark the local note as published
-            import('../../lib/idb').then(({ updateNote }) => {
-              updateNote(activeNote.id, { isPublished: true, publishedNodeId: nodeId });
-            });
-          }}
-        />
-      )}
+      <OrganizePanel
+        note={activeNote}
+        body={body}
+        collapsed={panelCollapsed}
+        onToggleCollapsed={togglePanel}
+        onOrganize={handleOrganize}
+        isOrganizing={isOrganizing}
+        organizeError={organizeError}
+        lastOrganizedAt={lastOrganizedAt}
+        suggestions={suggestions}
+        onAcceptClassificationSuggestion={acceptClassificationSuggestion}
+        onDismissClassificationSuggestion={dismissClassificationSuggestion}
+        onAcceptPrivilegeSuggestion={acceptPrivilegeSuggestion}
+        onDismissPrivilegeSuggestion={dismissPrivilegeSuggestion}
+        onInsertLinkLabel={insertLinkLabel}
+      />
     </div>
   );
 }
