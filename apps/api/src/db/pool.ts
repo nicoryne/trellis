@@ -1,7 +1,8 @@
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config();                           // load .env defaults
+dotenv.config({ path: '.env.local', override: true }); // local secrets override
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

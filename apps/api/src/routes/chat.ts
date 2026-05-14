@@ -18,7 +18,7 @@ const chatSchema = z.object({
  *   event: token         → { text: string }
  *   event: done          → { confidence: string, sourceCount: number }
  */
-router.post('/chat', auth, async (req: Request, res: Response) => {
+router.post('/', auth, async (req: Request, res: Response) => {
   const parsed = chatSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({

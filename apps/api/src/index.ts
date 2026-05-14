@@ -12,6 +12,7 @@ import seedRouter from './routes/seed';
 import healthRouter from './routes/health';
 
 dotenv.config();
+dotenv.config({ path: '.env.local', override: true });
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;
