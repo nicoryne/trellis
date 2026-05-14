@@ -11,10 +11,14 @@
             "id": "b12e86c727303de6",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "templates/source.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "source"
             }
           }
         ]
@@ -178,6 +182,7 @@
   },
   "active": "b12e86c727303de6",
   "lastOpenFiles": [
+    "sources/trellis-context-dump.md",
     "questions/lobster-trap-day-5-go-no-go.md",
     "entities/harvey.md",
     "topics/trellis-demo-narrative.md.tmp.29852.ea895fe6a147",
@@ -207,7 +212,6 @@
     "questions/performance-review-integration.md",
     "questions/v1-seed-strategy-at-firm-onboarding.md",
     "questions/departure-capture-mechanics.md",
-    "questions/buyer-at-firms-without-km-function.md",
     "sources/trellis-context-dump.md.tmp.29852.d852a629639d"
   ]
 }

@@ -1,7 +1,7 @@
 // apps/web/src/views/publish/RedactionModal.tsx
-import React, { useEffect, useState, useRef } from 'react';
-import { X } from 'lucide-react';
-import type { PersonalNote, RedactResponse } from '../../types/index';
+import { useEffect, useMemo, useState } from 'react';
+import { X, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
+import type { PersonalNote, RedactResponse, RedactionItem } from '../../types/index';
 import { useAuthStore } from '../../store/authStore';
 import { redactContent, publishNote } from '../../api/publish';
 import { PreservationScore } from './PreservationScore';
@@ -15,17 +15,61 @@ interface RedactionModalProps {
   onPublished: (nodeId: string) => void;
 }
 
+function reasonFor(type: RedactionItem['type']): string {
+  return type === 'PII'
+    ? 'Personally identifying or client-confidential token replaced'
+    : 'Specific fact generalized to legal-principle level';
+}
+
+function rebuildSanitized(
+  original: string,
+  redactions: RedactionItem[],
+  rejected: Set<number>,
+  fallback: string
+): string {
+  if (redactions.length === 0) return fallback;
+  const sorted = redactions
+    .map((r, idx) => ({ r, idx }))
+    .sort((a, b) => a.r.position[0] - b.r.position[0]);
+
+  let out = '';
+  let cursor = 0;
+  for (const { r, idx } of sorted) {
+    const [start, end] = r.position;
+    if (start < cursor) continue;
+    out += original.slice(cursor, start);
+    out += rejected.has(idx) ? r.original : r.replacement;
+    cursor = end;
+  }
+  out += original.slice(cursor);
+  return out;
+}
+
 export function RedactionModal({ note, onClose, onPublished }: RedactionModalProps) {
   const token = useAuthStore((s) => s.token);
   const [redactData, setRedactData] = useState<RedactResponse | null>(null);
   const [sanitizedText, setSanitizedText] = useState('');
+  const [rejected, setRejected] = useState<Set<number>>(new Set());
+  const [paneVersion, setPaneVersion] = useState(0);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const hasManualEdit = sanitizedText !== redactData?.sanitized;
+  const displaySanitized = useMemo(() => {
+    if (!redactData) return '';
+    return rebuildSanitized(
+      redactData.original,
+      redactData.redactions,
+      rejected,
+      redactData.sanitized
+    );
+  }, [redactData, rejected]);
+
+  const hasManualEdit = sanitizedText !== '' && sanitizedText !== displaySanitized;
+  const hasRejections = rejected.size > 0;
   const canPublish = redactData
-    ? redactData.confidence > 40 || hasManualEdit
+    ? redactData.confidence > 40 || hasManualEdit || hasRejections
     : false;
 
   // Load redaction on mount
@@ -45,6 +89,14 @@ export function RedactionModal({ note, onClose, onPublished }: RedactionModalPro
     });
   }, [note.body, token]);
 
+  // When user rejects/un-rejects, force the editable pane to remount with rebuilt text
+  useEffect(() => {
+    if (!redactData) return;
+    setSanitizedText(displaySanitized);
+    setPaneVersion((v) => v + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rejected, redactData]);
+
   // Escape key to close
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -53,6 +105,15 @@ export function RedactionModal({ note, onClose, onPublished }: RedactionModalPro
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  function toggleReject(idx: number) {
+    setRejected((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }
 
   async function handlePublish() {
     if (!token || !canPublish) return;
@@ -110,12 +171,66 @@ export function RedactionModal({ note, onClose, onPublished }: RedactionModalPro
             </div>
           )}
           {redactData && !loading && (
-            <DiffPane
-              original={redactData.original}
-              sanitized={redactData.sanitized}
-              redactions={redactData.redactions}
-              onSanitizedChange={setSanitizedText}
-            />
+            <>
+              <DiffPane
+                key={paneVersion}
+                original={redactData.original}
+                sanitized={displaySanitized}
+                redactions={redactData.redactions}
+                onSanitizedChange={setSanitizedText}
+              />
+
+              {/* Details disclosure — design §8.1 */}
+              <div className="redaction-details">
+                <button
+                  type="button"
+                  className="redaction-details-toggle"
+                  onClick={() => setDetailsOpen((o) => !o)}
+                  aria-expanded={detailsOpen}
+                >
+                  {detailsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  Details — {redactData.redactions.length} redaction
+                  {redactData.redactions.length === 1 ? '' : 's'}
+                </button>
+
+                {detailsOpen && (
+                  <ul className="redaction-list" role="list">
+                    {redactData.redactions.map((r, idx) => {
+                      const isRejected = rejected.has(idx);
+                      return (
+                        <li key={idx} className={`redaction-row${isRejected ? ' rejected' : ''}`}>
+                          <span
+                            className={`redaction-type-badge ${r.type === 'PII' ? 'pii' : 'gen'}`}
+                          >
+                            {r.type === 'PII' ? 'PII' : 'Generalized'}
+                          </span>
+                          <div className="redaction-row-body">
+                            <div className="redaction-row-pair">
+                              <code className="redaction-original">{r.original}</code>
+                              <span className="redaction-arrow">→</span>
+                              <code className="redaction-replacement">
+                                {isRejected ? r.original : r.replacement}
+                              </code>
+                            </div>
+                            <div className="redaction-reason">{reasonFor(r.type)}</div>
+                          </div>
+                          <button
+                            type="button"
+                            className="redaction-reject-btn"
+                            onClick={() => toggleReject(idx)}
+                            aria-pressed={isRejected}
+                            title={isRejected ? 'Re-apply redaction' : 'Restore original text'}
+                          >
+                            <RotateCcw size={12} />
+                            {isRejected ? 'Re-apply' : 'Restore'}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </>
           )}
         </div>
 

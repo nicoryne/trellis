@@ -3,9 +3,9 @@ title: Insight preservation score
 type: concept
 status: active
 tags: [redaction, metric, trellis]
-sources: [trellis-product-requirements, trellis-design-guidelines]
+sources: [trellis-product-requirements, trellis-design-guidelines, trellis-implementation-plan]
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-14
 ---
 
 # Insight preservation score
@@ -38,6 +38,15 @@ The [[redaction-pipeline]] has two competing goals:
 
 Without a preservation check, the pipeline can succeed at goal 1 while quietly defeating goal 2 — leaving the team graph full of sanitized fragments that lawyers stop trusting. The score gives the lawyer (and the future Admin) a **legible signal** of when the system has over-redacted.
 
+## Implementation (as shipped — `apps/api/src/services/redaction.ts` + `views/publish/PreservationScore.tsx`)
+
+- **Model**: `gemini-2.5-flash`
+- **System prompt**: `apps/api/src/prompts/preserve.md`
+- **Return shape**: JSON `{ score: 0–100, reason: string }`
+- **Parse-failure fallback**: returns `50` (neither green nor red — keeps the publish flow alive without falsely encouraging or blocking)
+- **Visual**: 5 `.score-dot` elements, filled count `= Math.round((score / 100) * 5)`; thresholds **High ≥60 green**, **Medium 40–59 orange**, **Low <40 red**. Percentage shown beside dots.
+- **Publish gate**: `confidence > 40 || hasManualEdit` (gate logic lives in `RedactionModal.tsx`, not in the score itself)
+
 ## Evolution
 
 - **MVP**: single Flash call, single score.
@@ -51,3 +60,4 @@ Without a preservation check, the pipeline can succeed at goal 1 while quietly d
 
 - [[trellis-product-requirements]]
 - [[trellis-design-guidelines]]
+- [[trellis-implementation-plan]]

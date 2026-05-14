@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { startRecording, formatDuration, MAX_RECORDING_DURATION, type Recording } from '../../lib/audio';
-import { transcribeAudio } from '../../api/client';
+import { transcribeAudio, organizeNote } from '../../api/client';
 import { useNoteStore } from '../../store/noteStore';
 import { useAuthStore } from '../../store/authStore';
 
@@ -17,7 +17,8 @@ export default function AudioCapture() {
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const waveContainerRef = useRef<HTMLDivElement>(null);
   const blobRef = useRef<Blob | null>(null);
-  const { saveNote } = useNoteStore();
+  const [organizeError, setOrganizeError] = useState<string | null>(null);
+  const { saveNote, updateNoteOrganization } = useNoteStore();
   const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
@@ -75,8 +76,19 @@ export default function AudioCapture() {
     setState('editing');
   }
 
+  async function runOrganize(noteId: string, text: string) {
+    if (text.trim().length <= 20) return;
+    setOrganizeError(null);
+    const response = await organizeNote(text, token ?? '');
+    if (response.data) {
+      await updateNoteOrganization(noteId, response.data);
+    } else if (response.error) {
+      setOrganizeError(response.error.message);
+    }
+  }
+
   async function handleSave() {
-    await saveNote({
+    const note = await saveNote({
       title: 'Audio note',
       body: transcript,
       contentType: 'audio',
@@ -87,6 +99,7 @@ export default function AudioCapture() {
       isPrivileged: false,
       isPublished: false,
     });
+    await runOrganize(note.id, transcript);
     setState('idle');
     setTranscript('');
     setDuration(0);
@@ -175,6 +188,21 @@ export default function AudioCapture() {
           <button
             onClick={() => setError(null)}
             className="text-sm underline"
+            style={{ color: 'var(--accent-primary)' }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {organizeError && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs" style={{ color: 'var(--danger)' }}>
+            Organization failed
+          </span>
+          <button
+            onClick={() => setOrganizeError(null)}
+            className="text-xs underline"
             style={{ color: 'var(--accent-primary)' }}
           >
             Dismiss

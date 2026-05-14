@@ -2,7 +2,7 @@
 title: Index
 type: index
 status: active
-updated: 2026-05-13
+updated: 2026-05-14
 ---
 
 # Index
@@ -108,6 +108,8 @@ Catalog of every page in the wiki. Updated on every ingest and every lint.
 - [[trellis-codebase-structure]] — Monorepo layout: apps/, .agent/, infra/, docs/, vault/ — file ownership per developer
 - [[trellis-implementation-plan]] — 6-day sprint breakdown: 25 tickets (K-1–K-8, G-1–G-8, N-1–N-8), day-by-day plan, contingencies
 - [[trellis-capture-implementation]] — CAPTURE domain (Keith) fully implemented: IDB layer, types, organize service, all capture views, personal graph, seed data
+- [[trellis-govern-implementation]] — GOVERN domain (Gabe) fully implemented: auth, rate limiting, redaction backend + modal, app shell, team graph view, Toast
+- [[trellis-retrieval-implementation]] — RETRIEVAL domain (Nicolo) fully implemented: DB schema, 20-node seed, RAG service, SSE chat, canvas query overlay, deployment, audit fixes
 
 ## Questions
 

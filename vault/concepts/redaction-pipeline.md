@@ -3,9 +3,9 @@ title: Redaction pipeline
 type: concept
 status: active
 tags: [pipeline, privacy, trellis, ai]
-sources: [trellis-product-requirements, trellis-project-architecture, trellis-design-guidelines]
+sources: [trellis-product-requirements, trellis-project-architecture, trellis-design-guidelines, trellis-implementation-plan]
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-14
 ---
 
 # Redaction pipeline
@@ -31,6 +31,19 @@ The system prompt instructs Gemini to **preserve strategic insight while general
 
 **Plus — [[insight-preservation-score]]**: a single Gemini Flash call returns a 0–100 confidence score evaluating whether the sanitized version retains the strategic point. This replaces the explicit "Pass 4" preservation check from the full V1 pipeline.
 
+## Implementation (as shipped — `apps/api/src/services/redaction.ts`)
+
+- **Presidio endpoints**: analyzer at `:5001`, anonymizer at `:5002` (env-overridable via `PRESIDIO_ANALYZER_URL` / `PRESIDIO_ANONYMIZER_URL`)
+- **Docker images**: `mcr.microsoft.com/presidio-analyzer:latest`, `mcr.microsoft.com/presidio-anonymizer:latest`
+- **Pass 1 sequence**: `POST /analyze` → `POST /anonymize`
+- **Pass 2 model**: `gemini-2.5-pro`, system prompt at `apps/api/src/prompts/redact.md`
+- **Preservation score model**: `gemini-2.5-flash`, system prompt at `prompts/preserve.md`, output `{ score: 0–100, reason }`, **fallback `50` on JSON parse error**
+- **Embedding for publish**: `text-embedding-004` (768 dim)
+- **Routes**: `POST /api/redact` (input `{ content }` max 50,000 chars) and `POST /api/publish` (writes sanitized body to `team_graph_nodes`); both require JWT + rate limit
+- **Presidio failure fallback**: regex-based, three patterns only — `[A-Z][a-z]+ [A-Z][a-z]+` → `[PERSON]`, an email pattern → `[EMAIL]`, a phone pattern → `[PHONE]`. The fine-grained token vocabulary above (`[PERSON_A]`, `[ORG_A]`, `[AMOUNT]`, `[DATE]`, `[DATE_OFFSET_FROM_FILING]`) is the **Presidio-driven** path; the fallback collapses to a coarser set if Presidio is unreachable.
+
+See [[trellis-govern-implementation]] for the full breakdown.
+
 ## Definition (V1 — four passes)
 
 1. **Privileged content detection** — fine-tuned legal model + Presidio
@@ -42,11 +55,13 @@ The system prompt instructs Gemini to **preserve strategic insight while general
 
 The modal shows:
 
-- **Left pane**: original note (read-only)
-- **Right pane**: redacted version (editable text)
-- **Highlights**: each redaction visually marked on both sides with matching colors and connecting curves on hover
-- **Per-redaction controls**: accept (default), modify (inline edit), or reject (restore original)
-- **[[insight-preservation-score|Insight preservation indicator]]**: 0–100% bar at the top. Below 60% triggers a yellow warning; below 40% triggers red. Publish button disabled until score > 40% or the lawyer manually edits the right pane.
+- **Left pane**: original note (read-only) with highlighted redaction spans
+- **Right pane**: redacted version, `contentEditable`, free-form edits supported
+- **Highlights**: type-coded (`PII` vs `GENERALIZATION`) underline + background color
+- **Per-redaction controls**: a "Details" accordion below the diff lists each redaction with a **Restore / Re-apply** toggle. Toggling rebuilds the sanitized text from `(original, redactions, rejectedSet)`. Free-form "modify" is supported via direct edits to the right pane (no inline per-redaction edit affordance).
+- **[[insight-preservation-score|Insight preservation indicator]]**: **5 dots, color-coded** (High ≥60 green, Medium 40–59 orange, Low <40 red), with percentage displayed beside. Publish gated by `confidence > 40 || hasManualEdit || hasRejections`.
+
+> ⚠ Deviation from spec — partially closed: per-redaction **reject** is implemented (Restore / Re-apply) and per-redaction **modify** is reached via free-form edits to the right pane; there is no inline modify affordance. Connecting curves between original/redacted spans on hover are **not implemented** — the match is shown via shared color coding only. The 0–100% bar in the original spec became a 5-dot indicator in implementation. The remaining deviations are intentional cost trims, not regressions.
 
 See [[hero-moments]] §1 for the full design spec.
 
@@ -84,3 +99,4 @@ The lawyer reviews and clicks "Publish." The sanitized version commits to the te
 - [[trellis-product-requirements]]
 - [[trellis-project-architecture]]
 - [[trellis-design-guidelines]]
+- [[trellis-implementation-plan]]

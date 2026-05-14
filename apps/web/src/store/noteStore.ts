@@ -12,6 +12,7 @@ interface NoteState {
   ) => Promise<PersonalNote>;
   setActiveNote: (id: string | null) => void;
   updateNoteOrganization: (id: string, result: OrganizeResponse) => Promise<void>;
+  removeEntity: (noteId: string, entityId: string) => Promise<void>;
 }
 
 export const useNoteStore = create<NoteState>((set, get) => ({
@@ -50,5 +51,15 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     for (const entity of result.entities) {
       await idb.saveEntity(entity);
     }
+  },
+
+  removeEntity: async (noteId, entityId) => {
+    const note = get().notes.find(n => n.id === noteId);
+    if (!note) return;
+    const nextEntities = note.extractedEntities.filter(e => e.id !== entityId);
+    const updated = await idb.updateNote(noteId, { extractedEntities: nextEntities });
+    set(state => ({
+      notes: state.notes.map(n => (n.id === noteId ? updated : n)),
+    }));
   },
 }));

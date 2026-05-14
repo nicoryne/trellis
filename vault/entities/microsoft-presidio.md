@@ -3,9 +3,9 @@ title: Microsoft Presidio
 type: entity
 status: active
 tags: [pii, redaction, oss, microsoft]
-sources: [trellis-project-architecture, trellis-product-requirements]
+sources: [trellis-project-architecture, trellis-product-requirements, trellis-implementation-plan]
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-14
 ---
 
 # Microsoft Presidio
@@ -29,6 +29,14 @@ Open-source PII (Personally Identifiable Information) detection and anonymizatio
 - **MVP**: Pass 1 only (Presidio); Pass 2 generalization runs on [[gemini]]; preservation score (the simplified V1 Pass 4) is a Gemini Flash call.
 - **V1**: full four-pass pipeline — privilege detection (fine-tuned legal model + Presidio), client identifier scrubbing, generalization, preservation check.
 
+## Deployment (as shipped)
+
+- **Two sidecar containers** in `infra/docker-compose.yml`:
+  - `presidio-analyzer` — image `mcr.microsoft.com/presidio-analyzer:latest`, port **5001**
+  - `presidio-anonymizer` — image `mcr.microsoft.com/presidio-anonymizer:latest`, port **5002**
+- **Backend integration** (`apps/api/src/services/redaction.ts`): the API calls `POST /analyze` then `POST /anonymize` against these services; URLs are env-overridable via `PRESIDIO_ANALYZER_URL` / `PRESIDIO_ANONYMIZER_URL`.
+- **Failure fallback**: if either Presidio service is unreachable, the API drops to a regex-only fallback covering three patterns (PERSON / EMAIL / PHONE). The coarser fallback keeps publish flows working but skips ORG / AMOUNT / DATE detection. (see [[trellis-govern-implementation]])
+
 ## Relations
 
 - **Used by**: [[trellis]] [[redaction-pipeline]] (Pass 1 in MVP, Passes 1–2 in V1)
@@ -42,3 +50,4 @@ Open-source PII (Personally Identifiable Information) detection and anonymizatio
 
 - [[trellis-project-architecture]]
 - [[trellis-product-requirements]]
+- [[trellis-implementation-plan]]
