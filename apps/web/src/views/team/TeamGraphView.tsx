@@ -60,7 +60,7 @@ export function TeamGraphView() {
         {
           selector: 'node',
           style: {
-            'background-color': (el) => NODE_COLORS[el.data('nodeType')] ?? '#7d8590',
+            'background-color': (el: cytoscape.NodeSingular) => NODE_COLORS[el.data('nodeType')] ?? '#7d8590',
             'background-opacity': 0.9,
             width: 14,
             height: 14,
@@ -80,12 +80,12 @@ export function TeamGraphView() {
             'border-width': 0,
             // Obsidian-style glow
             'shadow-blur': 12,
-            'shadow-color': (el) => NODE_COLORS[el.data('nodeType')] ?? '#7d8590',
+            'shadow-color': (el: cytoscape.NodeSingular) => NODE_COLORS[el.data('nodeType')] ?? '#7d8590',
             'shadow-offset-x': 0,
             'shadow-offset-y': 0,
             'shadow-opacity': 0.6,
             'overlay-opacity': 0,
-          },
+          } as any,
         },
         {
           selector: 'node:active, node:grabbed',
@@ -95,7 +95,7 @@ export function TeamGraphView() {
             'shadow-blur': 20,
             'shadow-opacity': 0.85,
             'background-opacity': 1,
-          },
+          } as any,
         },
         {
           selector: 'node:selected',
@@ -108,7 +108,7 @@ export function TeamGraphView() {
             'shadow-opacity': 0.9,
             'background-opacity': 1,
             color: '#e6edf3',
-          },
+          } as any,
         },
         {
           selector: 'edge',
@@ -118,7 +118,7 @@ export function TeamGraphView() {
             'curve-style': 'bezier',
             opacity: 0.35,
             'overlay-opacity': 0,
-          },
+          } as any,
         },
         {
           selector: 'edge:selected',
