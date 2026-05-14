@@ -22,7 +22,7 @@ export default function TextCapture() {
   const [isOrganizing, setIsOrganizing] = useState(false);
   const [organizeError, setOrganizeError] = useState<string | null>(null);
   const [showRedaction, setShowRedaction] = useState(false);
-  const { saveNote, setActiveNote, updateNoteOrganization, notes, activeNoteId } = useNoteStore();
+  const { saveNote, setActiveNote, updateNoteOrganization, removeEntity, notes, activeNoteId } = useNoteStore();
   const token = useAuthStore((s) => s.token);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noteIdRef = useRef<string | null>(null);
@@ -99,7 +99,7 @@ export default function TextCapture() {
           {activeNote.extractedEntities.map(entity => (
             <span
               key={entity.id}
-              className="px-2 py-1 rounded text-xs font-mono"
+              className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-mono"
               style={{
                 backgroundColor: 'var(--accent-primary-bg)',
                 color: ENTITY_COLORS[entity.type] ?? 'var(--text-primary)',
@@ -107,6 +107,15 @@ export default function TextCapture() {
               }}
             >
               {entity.type}: {entity.name}
+              <button
+                type="button"
+                onClick={() => removeEntity(activeNote.id, entity.id)}
+                aria-label={`Remove entity ${entity.name}`}
+                className="leading-none px-1 rounded opacity-60 hover:opacity-100"
+                style={{ color: 'inherit', background: 'transparent' }}
+              >
+                ×
+              </button>
             </span>
           ))}
         </div>

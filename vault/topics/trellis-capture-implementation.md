@@ -50,7 +50,7 @@ Note on Blob fields: IDB structured-clone stores Blobs but they may return as em
 
 ## Zustand note store (`apps/web/src/store/noteStore.ts`)
 
-IDB-backed save, load, and organization update. Sits between views and IDB; views never call IDB directly.
+IDB-backed save, load, and organization update. Sits between views and IDB; views never call IDB directly. Exposes `saveNote`, `setActiveNote`, `updateNoteOrganization`, and **`removeEntity(noteId, entityId)`** (used by the entity-chip "×" button).
 
 ## Fetch client (`apps/web/src/api/client.ts`)
 
@@ -74,9 +74,9 @@ Three routes, all require valid JWT, validated with Zod:
 ## Capture UI
 
 - **CaptureView**: tab shell (Write / Record / Upload), design-token styling
-- **TextCapture**: title + body markdown editor; 500ms debounced auto-save to IDB; entity chips appear after `POST /api/organize` returns; chips trigger on initial save and on body changes
-- **AudioCapture**: state machine (idle → recording → processing → done); WaveSurfer.js waveform; max 5 minutes (constant in `lib/audio.ts`); auto-stop moved to a dedicated effect (not inside `setDuration` updater — stale closure fix); editable transcript before save
-- **ImageCapture**: drag-drop + file picker; PNG/JPG/WebP validation; 10MB limit; Gemini Vision extraction; URL cleanup on unmount (object URL leak prevention); race condition guard on concurrent uploads
+- **TextCapture**: title + body markdown editor; 500ms debounced auto-save to IDB; entity chips appear after `POST /api/organize` returns; chips trigger on initial save and on body changes. Each chip has an **"×" remove button** that calls `noteStore.removeEntity(noteId, entityId)` (PRD acceptance criterion "Lawyer can manually correct any extraction error" — satisfied).
+- **AudioCapture**: state machine (idle → recording → processing → done); WaveSurfer.js waveform; max 5 minutes (constant in `lib/audio.ts`); auto-stop moved to a dedicated effect (not inside `setDuration` updater — stale closure fix); editable transcript before save. On save, calls `organizeNote(transcript)` if transcript length > 20 chars; updates the saved note with extracted entities.
+- **ImageCapture**: drag-drop + file picker; PNG/JPG/WebP validation; 10MB limit; Gemini Vision extraction; URL cleanup on unmount (object URL leak prevention); race condition guard on concurrent uploads. On save, calls `organizeNote(visionText)` if extracted text length > 20 chars.
 
 ## Personal graph (`apps/web/src/lib/graphUtils.ts` + `views/graph/PersonalGraphView.tsx`)
 

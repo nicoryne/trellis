@@ -3,9 +3,9 @@ title: Query-overlay graph animation
 type: concept
 status: active
 tags: [ui, motion, trellis, hero]
-sources: [trellis-product-requirements, trellis-design-guidelines, trellis-product-brief]
+sources: [trellis-product-requirements, trellis-design-guidelines, trellis-product-brief, trellis-implementation-plan]
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-14
 ---
 
 # Query-overlay graph animation
@@ -49,8 +49,21 @@ The animation **converts an architectural claim into a perceptual moment**. This
 
 This is Hero Moment 3 of three. The other two are the publish-with-redaction modal (Hero 1) and the chat-with-citations surface (Hero 2). Most design effort concentrates on these three.
 
+## Implementation (as shipped — `apps/web/src/views/chat/QueryOverlay.tsx`)
+
+- **Renderer**: a `<canvas>` element with `requestAnimationFrame`, **not Cytoscape** — the chat-time graph is a separate visual layer from the persistent team graph view. Deviation from "team graph fades in" if read literally; the perceptual effect is the same.
+- **Trigger**: SSE `cited-nodes` event (fires before the first `token` event)
+- **Timing**: fade-in **400ms**, hold **~800ms**, fade-out **600ms**
+- **Pulse implementation**: not a per-node scale wave; instead, all nodes render at **15% opacity** simultaneously, cited nodes render at **100%** with a glow effect when opacity > 0.5, and edges between cited nodes illuminate amber as their endpoints light up
+- **HiDPI**: canvas scaled by `devicePixelRatio`
+- **Reduced motion**: rAF loops skipped; opacity set directly to 1, holds ~800ms, then collapses instantly
+- **Determinism fix**: an early implementation had `Math.random()` inside the render loop causing per-frame jitter; replaced with `stableJitter()` (see [[trellis-retrieval-implementation|audit fixes]])
+
+> ⚠ Deviation from spec: the spec described a per-node scale pulse (1.0 → 1.15 → 1.0) with edges illuminating via `stroke` transitions; the canvas implementation achieves the same perceptual effect via opacity + glow without per-node scale animation.
+
 ## Sources
 
 - [[trellis-product-requirements]]
 - [[trellis-design-guidelines]]
 - [[trellis-product-brief]]
+- [[trellis-implementation-plan]]

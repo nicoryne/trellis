@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { analyzeImage } from '../../api/client';
+import { analyzeImage, organizeNote } from '../../api/client';
 import { useNoteStore } from '../../store/noteStore';
 import { useAuthStore } from '../../store/authStore';
 
@@ -13,9 +13,10 @@ export default function ImageCapture() {
   const [preview, setPreview] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [organizeError, setOrganizeError] = useState<string | null>(null);
   const fileRef = useRef<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { saveNote } = useNoteStore();
+  const { saveNote, updateNoteOrganization } = useNoteStore();
   const token = useAuthStore((s) => s.token);
 
   // Fix 1A + Fix 2: Revoke object URL when preview changes or on unmount
@@ -58,7 +59,7 @@ export default function ImageCapture() {
 
   async function handleSave() {
     if (!fileRef.current) return;
-    await saveNote({
+    const note = await saveNote({
       // Fix 8: Fallback title for dotfiles / extension-only names
       title: fileRef.current.name.replace(/\.[^.]+$/, '') || 'Untitled image',
       body: text,
@@ -70,6 +71,15 @@ export default function ImageCapture() {
       isPrivileged: false,
       isPublished: false,
     });
+    if (text.trim().length > 20) {
+      setOrganizeError(null);
+      const response = await organizeNote(text, token ?? '');
+      if (response.data) {
+        await updateNoteOrganization(note.id, response.data);
+      } else if (response.error) {
+        setOrganizeError(response.error.message);
+      }
+    }
     reset();
   }
 
@@ -174,6 +184,21 @@ export default function ImageCapture() {
           <button
             onClick={reset}
             className="text-sm underline"
+            style={{ color: 'var(--accent-primary)' }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {organizeError && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs" style={{ color: 'var(--danger)' }}>
+            Organization failed
+          </span>
+          <button
+            onClick={() => setOrganizeError(null)}
+            className="text-xs underline"
             style={{ color: 'var(--accent-primary)' }}
           >
             Dismiss

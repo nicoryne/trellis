@@ -67,31 +67,31 @@ These files are created once and should not be modified without coordination:
 | K-7 | 4 | P0 | ✓ | Personal note pre-seeding (**6** PH litigation notes with extracted entities seeded into IDB for Lawyer on first login) |
 | K-8 | 5 | P0 | ✓ | Capture polish + demo prep (loading states, error handling, entity chip styling, transitions, full test coverage) |
 
-### Gabe — GOVERN
+### Gabe — GOVERN ✓ Complete (as of 2026-05-14)
 
-| Ticket | Day | Priority | Description |
-|---|---|---|---|
-| G-1 | 1 | P0 | Auth backend + login view (`POST /api/auth/login` → JWT 24h; 3 pre-seeded accounts: `litigator@acme.law`, `lead@acme.law`, `admin@acme.law`, password `demo`) |
-| G-2 | 1 | P0 | App shell + navigation (top nav 56px + side nav 240px; Lucide icons; amber active state; protected route wrapper) |
-| G-3 | 1 | P0 | Express server foundation (CORS; JWT middleware; rate limit 60 req/min/user; response envelope `{data, error?}`) |
-| G-4 | 2–3 | P0 | Redaction backend service (`POST /api/redact`: Presidio Pass 1 → Gemini Pro Pass 2 → preservation score; `POST /api/publish`: embed → insert team_graph_nodes + edges) |
-| G-5 | 3–4 | P0 | Redaction modal UI — hero moment 1 (full-screen split pane; connecting-curve hover; preservation score bar; per-redaction accept/modify/reject; publish toast) |
-| G-6 | 4 | P0 | Team graph view (read-only Cytoscape.js; click → slide-in node summary panel; same visual language as personal graph) |
-| G-7 | 2 | P0 | Team graph API route (`GET /api/team-graph`; `GET /api/team-graph/nodes/:id`) |
-| G-8 | 5 | P0 | Governance polish + demo prep (login error states, modal animations, toast styling, team graph loading skeleton) |
+| Ticket | Day | Priority | Status | Description |
+|---|---|---|---|---|
+| G-1 | 1 | P0 | ✓ | Auth backend + login view (`POST /api/auth/login` → JWT 24h; bcrypt 10 rounds; 3 pre-seeded accounts: Ana Mendoza / Carlos Reyes / Diana Santos at `litigator|lead|admin@acme.law`, password `demo`) |
+| G-2 | 1 | P0 | ✓ | App shell + navigation (top nav 56px + side nav 240px; Lucide icons; amber active state; ProtectedRoute wrapper) |
+| G-3 | 1 | P0 | ✓ | Express server foundation (CORS; JWT middleware; rate limit 60 req/60s in-memory; 429 `{ code: 'RATE_LIMITED' }`) |
+| G-4 | 2–3 | P0 | ✓ | Redaction backend service (`POST /api/redact`: Presidio :5001/:5002 → Gemini 2.5 Pro → preservation score; regex fallback on Presidio failure; `POST /api/publish`: embed via `text-embedding-004` → insert team_graph_nodes + edges) |
+| G-5 | 3–4 | P0 | ✓ | Redaction modal UI — hero moment 1 (full-screen split pane; **5-dot preservation score** (not 0–100% bar); contentEditable right pane; publish gated by `confidence > 40 \|\| hasManualEdit`; connecting curves not implemented — intentional cost trim) |
+| G-6 | 4 | P0 | ✓ | Team graph view (read-only Cytoscape.js cose layout; click → 340px slide-in node summary panel; opacity-based search filter) |
+| G-7 | 2 | P0 | ✓ | Team graph API route (`GET /api/team-graph`; `GET /api/team-graph/nodes/:id`) |
+| G-8 | 5 | P0 | ✓ | Governance polish + demo prep (login error states, modal animations, Toast 3s auto-dismiss, reduced-motion handling, a11y, nav active states) |
 
-### Nicolo — RETRIEVAL
+### Nicolo — RETRIEVAL ✓ Complete (as of 2026-05-14)
 
-| Ticket | Day | Priority | Description |
-|---|---|---|---|
-| N-1 | 1 | P0 | Database setup + schema (Postgres pool via `pg`; DDL for users / team_graph_nodes / team_graph_edges; pgvector HNSW index; `docker-compose.yml`) |
-| N-2 | 1–2 | P0 | Seed data script + content (15–30 published insights: judge tendencies, opposing counsel, motion practice, expert witnesses, settlement, procedural lessons; PH law context; seed voice: conclusory + brief narrative, 2–3 sentences; `POST /api/seed` idempotent dev endpoint; **canonical demo query must return a strong, cited response**) |
-| N-3 | 2–3 | P0 | RAG service backend (embed → top-8 cosine via pgvector → 1-hop graph expansion → filter >0.55 → Gemini Pro streaming with grounding prompt; confidence: High 3+×>0.80, Medium 2+×>0.70, Low 1×>0.75, Refuse 0 nodes >0.75) |
-| N-4 | 3 | P0 | Chat API route (streaming SSE; first event = cited node IDs for overlay trigger; subsequent events = tokens; confidence metadata) |
-| N-5 | 3–4 | P0 | Chat view UI (streaming response; citation chips `[1]`, `[2,3]` in amber; clickable → node summary panel; confidence badge; refusal state styled) |
-| N-6 | 4–5 | P0 | Query-overlay animation — hero moment 3 (chat dims 30% at 150ms; full-screen overlay fade-in 400ms; team graph fades in; cited nodes pulse in rank order 150ms apart; 1s hold; 600ms fade-out as response streams; 60fps via `requestAnimationFrame`; `prefers-reduced-motion` respected; fallback: dim-only) |
-| N-7 | 4–5 | P0 | Deployment (Vercel for frontend; Railway for backend + Postgres + Presidio; env vars; seed on first deploy; HTTPS; single public URL) |
-| N-8 | 5–6 | P0 | Integration testing + demo hardening (full demo script end-to-end on deployed URL; canonical query <10s; publish <30s; overlay smooth; refusal works) |
+| Ticket | Day | Priority | Status | Description |
+|---|---|---|---|---|
+| N-1 | 1 | P0 | ✓ | Database setup + schema (Postgres 16 via `pgvector/pgvector:pg16`; pool via `pg`; DDL for users / team_graph_nodes / team_graph_edges; pgvector HNSW `vector_cosine_ops`; `docker-compose.yml` with postgres + presidio-analyzer + presidio-anonymizer) |
+| N-2 | 1–2 | P0 | ✓ | Seed data — **20 published insights** (5 judge tendencies / 3 opposing counsel / 4 motion practice / 3 expert witness / 3 settlement / 2 procedural); entity nodes auto-extracted and deduplicated; embeddings computed at seed time; `POST /api/seed` idempotent |
+| N-3 | 2–3 | P0 | ✓ | RAG service (embed → top-8 cosine → 1-hop expansion **insights only** → filter >0.55 → Gemini 2.5 Pro streaming; confidence: High 3+×≥0.80, Medium 2+×≥0.70, Low 1×≥0.75, Refuse 0×≥0.75) |
+| N-4 | 3 | P0 | ✓ | Chat SSE — events: `cited-nodes` (first), `token` (streaming), `done` (final with confidence + sourceCount) |
+| N-5 | 3–4 | P0 | ✓ | Chat view UI (streaming response; inline `[id]` citations parsed to chips; refusal state with explicit message; auto-scroll) |
+| N-6 | 4–5 | P0 | ✓ | Query overlay — **canvas-based** (deviation from spec — not Cytoscape-rendered): 15% base opacity, 100% cited + glow; fade-in 400ms / hold ~800ms / fade-out 600ms; `prefers-reduced-motion` skips rAF; HiDPI scaled |
+| N-7 | 4–5 | P0 | ✓ | Deployment (Vercel for frontend with SPA rewrites + asset caching; Railway for backend via Dockerfile; `GET /api/health` health check; env vars enumerated in `.env.example` files) |
+| N-8 | 5–6 | P0 | ✓ | Integration + audit (4 bugs caught in `4e69206` commit: package.json `type: module` regression, Zustand re-render bug, canvas jitter, prompt path resolution; postbuild `shx cp` for prompts + schema.sql to dist) |
 
 ## Day-by-day summary
 

@@ -3,9 +3,9 @@ title: RAG query pipeline
 type: concept
 status: active
 tags: [pipeline, ai, trellis, retrieval]
-sources: [trellis-project-architecture, trellis-product-requirements]
+sources: [trellis-project-architecture, trellis-product-requirements, trellis-implementation-plan]
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-14
 ---
 
 # RAG query pipeline
@@ -56,6 +56,19 @@ Pure top-k embedding similarity misses the relational structure of the team grap
 - Citation chips appear in the response only after the segment containing the citation has streamed.
 - The [[query-overlay-animation]] overlay holds for ~1 second after cited nodes pulse, then fades back as the response streams.
 
+## Implementation (as shipped — `apps/api/src/services/rag.ts`)
+
+- **Top-k**: **8** (matches spec)
+- **Final cosine threshold**: **0.55** for context inclusion (matches spec)
+- **Graph expansion**: 1-hop; **only `insight`-type neighbors are added to the context** — entity neighbors (`matter`, `party`, `lawyer`, `judge`, `witness`, `concept`, `precedent`, `statute`) are walked but not synthesized over. Keeps the context focused on synthesizable claims.
+- **Synthesis model**: `gemini-2.5-pro`, streaming
+- **System prompt**: `apps/api/src/prompts/chat.md`
+- **Refusal message** (exact text): *"I don't have firm knowledge that directly addresses this. You may want to capture your own thinking on this topic as a starting point."*
+- **SSE event sequence**: (1) `cited-nodes` with `{ nodeIds, confidence }`, then (2..N) `token` events with `{ text }`, finally `done` with `{ confidence, sourceCount }`. The `cited-nodes` event fires **first** so the frontend can trigger the [[query-overlay-animation]] while Gemini is still streaming.
+- **Citation format**: inline `[node_id]` markers in the response body; Sources section after `---` lists `[id] Title`
+
+See [[trellis-retrieval-implementation]] for the full breakdown.
+
 ## Relation to RAG generally
 
 This is RAG in the **classical** sense — see [[rag]] for the contrast with the [[llm-wiki-pattern]] and the broader pattern. The graph-traversal layer is what differentiates Trellis's RAG from chunk-only retrieval.
@@ -64,3 +77,4 @@ This is RAG in the **classical** sense — see [[rag]] for the contrast with the
 
 - [[trellis-project-architecture]]
 - [[trellis-product-requirements]]
+- [[trellis-implementation-plan]]

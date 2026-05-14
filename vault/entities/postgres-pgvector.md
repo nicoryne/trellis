@@ -14,12 +14,16 @@ Trellis MVP runs a **single Postgres 16 instance** holding users, the team graph
 
 ## Key facts
 
-- **Extensions enabled**: `pgvector` (vector similarity), `uuid-ossp` (UUID generation). (see [[trellis-project-architecture]])
-- **Tables**: `users`, `sessions`, `team_graph_nodes`, `team_graph_edges`, `seed_data`.
+- **Image**: `pgvector/pgvector:pg16` (Postgres 16 with pgvector preinstalled). (see [[trellis-project-architecture]])
+- **Extensions enabled**: `vector` (pgvector similarity), `uuid-ossp` (UUID generation).
+- **Tables (as shipped)**: `users`, `team_graph_nodes`, `team_graph_edges`. Sessions are stateless (JWT); `seed_data` was rolled into the seed script itself rather than a table.
 - **Embedding column**: `embedding vector(768)` on `team_graph_nodes`, matching [[gemini|`text-embedding-004`]] output dimension.
 - **Index**: `CREATE INDEX idx_embedding ON team_graph_nodes USING hnsw (embedding vector_cosine_ops)`.
 - **Edge typing**: `edge_type IN ('mentions','involves','cites','authored_by','about','concerns','related_to')`.
 - **Node typing**: `node_type IN ('insight','matter','party','lawyer','judge','witness','concept','precedent','statute')`.
+- **Edge uniqueness**: `UNIQUE (source_node_id, target_node_id, edge_type)` — prevents duplicate edges of the same type between the same pair.
+- **Cascade**: `team_graph_edges` has `ON DELETE CASCADE` from both `source_node_id` and `target_node_id` — deleting a node sweeps its incident edges.
+- **Health check**: `pg_isready -U trellis` in `docker-compose.yml`.
 
 ## Why pgvector + relational rather than a dedicated graph DB
 
