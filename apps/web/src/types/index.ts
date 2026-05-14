@@ -26,10 +26,35 @@ export interface Entity {
   confidence: number;
 }
 
+export interface NoteLink {
+  /** Stable UUID of the target note; survives title renames. Empty string for unresolved links. */
+  targetNoteId: string;
+  /** Original label the user typed inside [[...]] at link-creation time. */
+  displayLabel: string;
+  /** Optional [start, end] char offsets in body for editor highlighting. */
+  position?: [number, number];
+}
+
+export type OrganizeFieldProvenance = 'unset' | 'ai' | 'user';
+
+export interface OrganizeProvenance {
+  entities: OrganizeFieldProvenance;
+  classification: OrganizeFieldProvenance;
+  privilege: OrganizeFieldProvenance;
+}
+
+export interface NoteFolder {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface PersonalNote {
   id: string;
   title: string;
   body: string;
+  folderId?: string;
   contentType: 'text' | 'audio' | 'image';
   /** Stored via IDB structured clone — reconstruct with new Blob([arrayBuffer]) if retrieved as empty after a page reload. */
   audioBlob?: Blob;
@@ -43,6 +68,14 @@ export interface PersonalNote {
   publishedNodeId?: string;
   createdAt: number; // epoch ms
   updatedAt: number; // epoch ms
+  /** Outbound wikilinks resolved at save time. */
+  links?: NoteLink[];
+  /** Soft-delete marker. Absent = live note. */
+  deletedAt?: number;
+  /** Tracks whether each organize field was last set by AI or user. */
+  organizeProvenance?: OrganizeProvenance;
+  /** AI-suggested entities the user has previously removed; do not auto-re-add. Keys are `${type}:${name}`. */
+  dismissedEntityKeys?: string[];
 }
 
 export interface OrganizeResponse {

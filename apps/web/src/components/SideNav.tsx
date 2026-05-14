@@ -1,13 +1,14 @@
-// apps/web/src/components/SideNav.tsx
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Network, PenLine, Users, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Network, Users, MessageSquare, ChevronLeft, ChevronRight,
+  ChevronDown, ChevronRight as ChevronRightSm,
+  Plus, FileText, Folder, FolderOpen, Upload, PenLine,
+} from 'lucide-react';
 import { motion } from 'motion/react';
-
-const CAPTURE_ITEMS = [
-  { path: '/capture', label: 'Capture', Icon: PenLine },
-  { path: '/graph', label: 'Personal Graph', Icon: Network },
-];
+import { useNoteStore } from '../store/noteStore';
+import { RedactionModal } from '../views/publish/RedactionModal';
+import type { PersonalNote, NoteFolder } from '../types/index';
 
 const TEAM_ITEMS = [
   { path: '/team', label: 'Team Graph', Icon: Users },
@@ -17,13 +18,13 @@ const TEAM_ITEMS = [
 interface NavItemProps {
   path: string;
   label: string;
-  Icon: React.ComponentType<{ size?: number; 'aria-hidden'?: boolean }>;
+  Icon: React.ComponentType<{ size?: number }>;
   active: boolean;
   collapsed: boolean;
   onClick: () => void;
 }
 
-function NavItem({ path: _path, label, Icon, active, collapsed, onClick }: NavItemProps) {
+function NavItem({ label, Icon, active, collapsed, onClick }: NavItemProps) {
   return (
     <button
       className={`side-nav-item${active ? ' active' : ''}`}
@@ -39,9 +40,66 @@ function NavItem({ path: _path, label, Icon, active, collapsed, onClick }: NavIt
           transition={{ type: 'spring', stiffness: 380, damping: 32 }}
         />
       )}
-      <Icon size={18} aria-hidden />
+      <Icon size={18} />
       <span className="side-nav-label">{label}</span>
     </button>
+  );
+}
+
+interface NoteRowProps {
+  note: PersonalNote;
+  active: boolean;
+  indent: boolean;
+  onClick: () => void;
+}
+
+function NoteRow({ note, active, indent, onClick }: NoteRowProps) {
+  return (
+    <button
+      className={`file-tree-note${active ? ' active' : ''}${indent ? ' indented' : ''}`}
+      onClick={onClick}
+      title={note.title || 'Untitled'}
+    >
+      <FileText size={13} />
+      <span className="file-tree-note-title">
+        {note.title || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Untitled</span>}
+      </span>
+    </button>
+  );
+}
+
+interface FolderRowProps {
+  folder: NoteFolder;
+  notes: PersonalNote[];
+  activeNoteId: string | null;
+  expanded: boolean;
+  onToggle: () => void;
+  onNoteClick: (note: PersonalNote) => void;
+}
+
+function FolderRow({ folder, notes, activeNoteId, expanded, onToggle, onNoteClick }: FolderRowProps) {
+  return (
+    <div className="file-tree-folder">
+      <button className="file-tree-folder-header" onClick={onToggle} title={folder.name}>
+        {expanded
+          ? <ChevronDown size={12} className="file-tree-chevron" />
+          : <ChevronRightSm size={12} className="file-tree-chevron" />}
+        {expanded ? <FolderOpen size={14} /> : <Folder size={14} />}
+        <span className="file-tree-folder-name">{folder.name}</span>
+        {notes.length > 0 && (
+          <span className="file-tree-folder-count">{notes.length}</span>
+        )}
+      </button>
+      {expanded && notes.map(note => (
+        <NoteRow
+          key={note.id}
+          note={note}
+          active={activeNoteId === note.id}
+          indent
+          onClick={() => onNoteClick(note)}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -56,10 +114,118 @@ export function SideNav({ collapsed, mobileOpen, onToggleCollapsed, onMobileClos
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
+  const {
+    notes, folders, activeNoteId,
+    loadNotes, loadFolders,
+    saveNote, setActiveNote, createFolder, markNotePublished,
+  } = useNoteStore();
+
+  // Local UI state
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [showRedaction, setShowRedaction] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    loadNotes();
+    loadFolders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [dropdownOpen]);
+
+  // Focus folder input when it appears
+  useEffect(() => {
+    if (creatingFolder) folderInputRef.current?.focus();
+  }, [creatingFolder]);
+
   function handleNav(path: string) {
     navigate(path);
     onMobileClose();
   }
+
+  async function handleNewNote() {
+    setDropdownOpen(false);
+    const note = await saveNote({
+      title: '',
+      body: '',
+      contentType: 'text',
+      extractedEntities: [],
+      classification: 'observation',
+      isPrivileged: false,
+      isPublished: false,
+    });
+    setActiveNote(note.id);
+    navigate('/capture');
+    onMobileClose();
+  }
+
+  function handleNewFolder() {
+    setDropdownOpen(false);
+    setCreatingFolder(true);
+    setNewFolderName('');
+  }
+
+  async function commitNewFolder() {
+    const name = newFolderName.trim();
+    if (name) {
+      const folder = await createFolder(name);
+      setExpandedFolders(prev => new Set([...prev, folder.id]));
+    }
+    setCreatingFolder(false);
+    setNewFolderName('');
+  }
+
+  function handleFolderKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') commitNewFolder();
+    if (e.key === 'Escape') { setCreatingFolder(false); setNewFolderName(''); }
+  }
+
+  function toggleFolder(id: string) {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function handleNoteClick(note: PersonalNote) {
+    setActiveNote(note.id);
+    navigate('/capture');
+    onMobileClose();
+  }
+
+  // Build tree: group notes by folder, collect unfiled
+  const notesByFolder: Record<string, PersonalNote[]> = {};
+  const unfiledNotes: PersonalNote[] = [];
+
+  const sortedNotes = [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
+  for (const note of sortedNotes) {
+    if (note.folderId && folders.find(f => f.id === note.folderId)) {
+      if (!notesByFolder[note.folderId]) notesByFolder[note.folderId] = [];
+      notesByFolder[note.folderId].push(note);
+    } else {
+      unfiledNotes.push(note);
+    }
+  }
+
+  const sortedFolders = [...folders].sort((a, b) => a.name.localeCompare(b.name));
+
+  const activeNote = notes.find(n => n.id === activeNoteId);
+  const canPublish = !!(activeNote && !activeNote.isPublished && activeNote.body.trim().length > 0);
 
   const cls = [
     'side-nav',
@@ -69,28 +235,153 @@ export function SideNav({ collapsed, mobileOpen, onToggleCollapsed, onMobileClos
 
   return (
     <aside className={cls}>
-      <div className="section-label">Personal</div>
-      {CAPTURE_ITEMS.map((item) => (
-        <NavItem
-          key={item.path}
-          {...item}
-          collapsed={collapsed}
-          active={pathname === item.path}
-          onClick={() => handleNav(item.path)}
-        />
-      ))}
+      {/* ── Collapsed: show icon for Capture + team nav ── */}
+      {collapsed ? (
+        <>
+          <div className="section-label">Personal</div>
+          <NavItem
+            path="/capture"
+            label="Capture"
+            Icon={PenLine}
+            active={pathname === '/capture'}
+            collapsed
+            onClick={() => handleNav('/capture')}
+          />
+          <NavItem
+            path="/graph"
+            label="Personal Graph"
+            Icon={Network}
+            active={pathname === '/graph'}
+            collapsed
+            onClick={() => handleNav('/graph')}
+          />
+          <div className="side-nav-divider" />
+          <div className="section-label">Team</div>
+          {TEAM_ITEMS.map(item => (
+            <NavItem
+              key={item.path}
+              {...item}
+              collapsed
+              active={pathname === item.path}
+              onClick={() => handleNav(item.path)}
+            />
+          ))}
+        </>
+      ) : (
+        <>
+          {/* ── Expanded: full file tree ── */}
+          <div className="section-label">Personal</div>
 
-      <div className="side-nav-divider" />
-      <div className="section-label">Team</div>
-      {TEAM_ITEMS.map((item) => (
-        <NavItem
-          key={item.path}
-          {...item}
-          collapsed={collapsed}
-          active={pathname === item.path}
-          onClick={() => handleNav(item.path)}
-        />
-      ))}
+          {/* Action bar: + New and Publish */}
+          <div className="file-tree-actions">
+            <div className="file-tree-new-wrap" ref={dropdownRef}>
+              <button
+                className="file-tree-btn file-tree-btn--new"
+                onClick={() => setDropdownOpen(v => !v)}
+                aria-label="New note or folder"
+              >
+                <Plus size={13} />
+                New
+                <ChevronDown size={11} style={{ opacity: 0.6 }} />
+              </button>
+              {dropdownOpen && (
+                <div className="file-tree-dropdown">
+                  <button className="file-tree-dropdown-item" onClick={handleNewNote}>
+                    <FileText size={14} />
+                    New Note
+                  </button>
+                  <button className="file-tree-dropdown-item" onClick={handleNewFolder}>
+                    <Folder size={14} />
+                    New Folder
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              className={`file-tree-btn file-tree-btn--publish${canPublish ? ' enabled' : ''}`}
+              onClick={() => canPublish && setShowRedaction(true)}
+              disabled={!canPublish}
+              title={canPublish ? 'Publish to team graph' : 'Open a note with content to publish'}
+            >
+              <Upload size={13} />
+              Publish
+            </button>
+          </div>
+
+          {/* File tree */}
+          <div className="file-tree">
+            {/* New folder inline input */}
+            {creatingFolder && (
+              <div className="file-tree-new-folder">
+                <Folder size={14} />
+                <input
+                  ref={folderInputRef}
+                  className="file-tree-folder-input"
+                  value={newFolderName}
+                  onChange={e => setNewFolderName(e.target.value)}
+                  onBlur={commitNewFolder}
+                  onKeyDown={handleFolderKeyDown}
+                  placeholder="Folder name"
+                />
+              </div>
+            )}
+
+            {/* Folders */}
+            {sortedFolders.map(folder => (
+              <FolderRow
+                key={folder.id}
+                folder={folder}
+                notes={notesByFolder[folder.id] ?? []}
+                activeNoteId={activeNoteId}
+                expanded={expandedFolders.has(folder.id)}
+                onToggle={() => toggleFolder(folder.id)}
+                onNoteClick={handleNoteClick}
+              />
+            ))}
+
+            {/* Unfiled notes */}
+            {unfiledNotes.map(note => (
+              <NoteRow
+                key={note.id}
+                note={note}
+                active={activeNoteId === note.id}
+                indent={false}
+                onClick={() => handleNoteClick(note)}
+              />
+            ))}
+
+            {/* Empty state */}
+            {notes.length === 0 && folders.length === 0 && !creatingFolder && (
+              <div className="file-tree-empty">
+                No notes yet.<br />Click + New to start.
+              </div>
+            )}
+          </div>
+
+          {/* Personal Graph nav item */}
+          <NavItem
+            path="/graph"
+            label="Personal Graph"
+            Icon={Network}
+            active={pathname === '/graph'}
+            collapsed={false}
+            onClick={() => handleNav('/graph')}
+          />
+
+          <div className="side-nav-divider" />
+          <div className="section-label">Team</div>
+          {TEAM_ITEMS.map(item => (
+            <NavItem
+              key={item.path}
+              {...item}
+              collapsed={false}
+              active={pathname === item.path}
+              onClick={() => handleNav(item.path)}
+            />
+          ))}
+        </>
+      )}
 
       <div className="side-nav-footer">
         <button
@@ -98,11 +389,21 @@ export function SideNav({ collapsed, mobileOpen, onToggleCollapsed, onMobileClos
           onClick={onToggleCollapsed}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {collapsed
-            ? <ChevronRight size={16} aria-hidden />
-            : <ChevronLeft size={16} aria-hidden />}
+          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
       </div>
+
+      {/* Redaction modal — portal-like, renders above everything */}
+      {showRedaction && activeNote && (
+        <RedactionModal
+          note={activeNote}
+          onClose={() => setShowRedaction(false)}
+          onPublished={(nodeId) => {
+            markNotePublished(activeNote.id, nodeId);
+            setShowRedaction(false);
+          }}
+        />
+      )}
     </aside>
   );
 }

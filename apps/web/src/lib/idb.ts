@@ -1,13 +1,14 @@
 import { openDB, type IDBPDatabase } from 'idb';
-import type { PersonalNote, Entity } from '../types/index';
+import type { PersonalNote, NoteFolder, Entity } from '../types/index';
 
 const DB_NAME = 'trellis-personal';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 type TrellisDB = {
   notes: { key: string; value: PersonalNote };
   entities: { key: string; value: Entity };
   personalGraph: { key: string; value: { id: string; data: unknown } };
+  folders: { key: string; value: NoteFolder };
 };
 
 let dbPromise: Promise<IDBPDatabase<TrellisDB>> | null = null;
@@ -24,6 +25,9 @@ function getDB(): Promise<IDBPDatabase<TrellisDB>> {
         }
         if (!db.objectStoreNames.contains('personalGraph')) {
           db.createObjectStore('personalGraph', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('folders')) {
+          db.createObjectStore('folders', { keyPath: 'id' });
         }
       },
     });
@@ -50,9 +54,11 @@ export async function getNote(id: string): Promise<PersonalNote | undefined> {
   return db.get('notes', id);
 }
 
-export async function getAllNotes(): Promise<PersonalNote[]> {
+export async function getAllNotes(options: { includeDeleted?: boolean } = {}): Promise<PersonalNote[]> {
   const db = await getDB();
-  return db.getAll('notes');
+  const all = await db.getAll('notes');
+  if (options.includeDeleted) return all;
+  return all.filter(n => !n.deletedAt);
 }
 
 export async function updateNote(
@@ -69,6 +75,15 @@ export async function updateNote(
 
 export async function deleteNote(id: string): Promise<void> {
   const db = await getDB();
+  const existing = await db.get('notes', id);
+  if (!existing) return;
+  const tombstoned: PersonalNote = { ...existing, deletedAt: Date.now() };
+  await db.put('notes', tombstoned);
+}
+
+/** Hard-delete a note (used by future trash UI). Not exposed to the store. */
+export async function hardDeleteNote(id: string): Promise<void> {
+  const db = await getDB();
   await db.delete('notes', id);
 }
 
@@ -82,7 +97,40 @@ export async function getAllEntities(): Promise<Entity[]> {
   return db.getAll('entities');
 }
 
-/** Resets the DB connection for test isolation. Call in beforeEach when using fake-indexeddb. */
+// ─── Folders ─────────────────────────────────────────────────────────────────
+
+export async function createFolder(name: string): Promise<NoteFolder> {
+  const db = await getDB();
+  const folder: NoteFolder = {
+    id: crypto.randomUUID(),
+    name,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  await db.put('folders', folder);
+  return folder;
+}
+
+export async function getAllFolders(): Promise<NoteFolder[]> {
+  const db = await getDB();
+  return db.getAll('folders');
+}
+
+export async function updateFolder(id: string, updates: Partial<Pick<NoteFolder, 'name'>>): Promise<NoteFolder> {
+  const db = await getDB();
+  const existing = await db.get('folders', id);
+  if (!existing) throw new Error(`Folder ${id} not found`);
+  const updated: NoteFolder = { ...existing, ...updates, updatedAt: Date.now() };
+  await db.put('folders', updated);
+  return updated;
+}
+
+export async function deleteFolder(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('folders', id);
+}
+
+/** Resets the DB connection for test isolation. */
 export function _resetDB(): void {
   dbPromise = null;
 }
