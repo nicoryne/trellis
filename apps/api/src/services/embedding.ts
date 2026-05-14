@@ -4,13 +4,17 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
 
 /**
- * Generate a 768-dimensional embedding for the given text using Gemini text-embedding-004.
+ * Generate a 768-dimensional embedding for the given text using Gemini gemini-embedding-001.
+ * Output pinned to 768 dims to match the existing vector(768) pgvector column.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-  const result = await model.embedContent(text);
+  const result = await model.embedContent({
+    content: { role: 'user', parts: [{ text }] },
+    outputDimensionality: 768,
+  });
   return result.embedding.values;
 }
 
