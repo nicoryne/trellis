@@ -13,6 +13,22 @@ Tip: `grep "^## \[" log.md | head -5` yields the last 5 entries.
 
 ---
 
+## [2026-05-14] note | Audio transcription migrated from Whisper to Gemini Flash
+
+`POST /api/transcribe` now calls `gemini-2.5-flash` with `inlineData` (base64 WebM/Opus) instead of the OpenAI Whisper API (`whisper-1`). The `openai` npm package was removed from `apps/api/package.json`. Response contract is unchanged: `{ data: { transcript: string } }`. The full capture flow (state machine, editable transcript, organize-on-save, IDB storage) is unaffected. Pages updated: [[whisper]], [[trellis-capture-implementation]].
+
+## [2026-05-14] ingest | Brand + chat/graph polish (commits `54120e7` + `ad3e14c`)
+
+Two commits landed substantial UI work. **(1) Brand surface**: new `Logo.tsx` component (`<img>` rendering `/trellis-logo.png`, scalable via `size` prop), favicon wired in `index.html`, Logo placed in TopNav (size 22), LoginView (size 56, staggered choreography with drop-shadow glow), ChatView welcome (size 56) and assistant avatars (size 20), PersonalGraphView empty state (size 64). New `--accent-primary-rgb: 251, 133, 0` token enables `rgba(var(...), α)` filter usage. The accent rebrand also revised two node colors that conflicted with the new orange: `witness` `#ff9f1c` → `#ffd60a` (saffron) and `statute` `#fb5607` → `#d62828` (crimson) — propagated to [[node-color-coding]] and [[trellis-design-system]] and noted in [[trellis-design-guidelines]]'s re-ingest table.
+
+**(2) Chat surface**: new [[trellis-retrieval-implementation|CitationChip]] (motion-spring hover, accent-orange styling, keyboard-operable) and [[trellis-retrieval-implementation|ConfidenceBadge]] (four states: high / medium / low / refuse with dot-fill metaphor, semantic palette colors). Refusal CTA "Capture your thinking on this" routes to `/capture`. Chat dim-cascade isolation: `.chat-content` wrapper carries the dim state so the overlay + sidepanel render above the cascade at full opacity.
+
+**(3) Graph surface**: created [[graph-zoom-control]] concept page — new persistent widget (`GraphZoomControl.tsx` + CSS, commit `ad3e14c`), bottom-right anchor, 20–150% range slider with gradient fill, fit-to-view reset (`Maximize2` icon). Adaptive label visibility at `LABEL_ZOOM_THRESHOLD = 0.75`. Wired into both PersonalGraphView and TeamGraphView. Updated [[cytoscape-js]], [[trellis-capture-implementation]].
+
+**(4) Query overlay refinements** ([[query-overlay-animation]], [[trellis-retrieval-implementation]]): explicit phase tracking (`'in' | 'hold' | 'out'`), status label "Searching firm knowledge" with animated dots, "ESC to dismiss" hint, edge reveal gated on both endpoints lit, halo glow on cited nodes at progress > 0.4. Timing constants captured: `FADE_IN_MS = 400`, `PULSE_STAGGER_MS = 150`, `PULSE_DURATION_MS = 300`, `FADE_OUT_MS = 600`. Canvas-based architecture confirmed stable.
+
+The Logo component was *not* given its own entity page — it's an implementation detail surfaced wherever brand consistency is needed; references go directly to [[trellis-logo]] as a wikilink-only stub for now.
+
 ## [2026-05-14] ingest | Design guidelines re-ingest — accent color revised from amber-gold to orange
 
 User updated `.agent/design-guidelines.md` §2.3 + §13: accent palette swapped from `#d4a72c` (amber/gold) to `#fb8500` (orange), with new hover `#ff9d2a`, muted `#8a4900`, bg-tint `#2d1a06`. Strict-rule wording in §2.5 also updated ("amber/gold" → "orange"). Propagated to: [[trellis-design-guidelines]] (source page — added re-ingest section with before/after table), [[trellis-design-system]] (accent table + lead sentence), [[node-color-coding]] (palette overlap rule, cited-edge color, "if a user sees X in the graph" paragraph), [[query-overlay-animation]] (cited-edge illumination), [[trellis-implementation-plan]] (G-2 nav active-state), [[trellis-govern-implementation]] (accent token value), [[trellis-retrieval-implementation]] (cited-edge illumination).

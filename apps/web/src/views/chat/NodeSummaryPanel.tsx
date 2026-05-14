@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { fetchNodeSummary } from '../../api/chat';
+import { useAuthStore } from '../../store/authStore';
 
 interface NodeSummaryPanelProps {
   nodeId: string | null;
@@ -14,6 +15,7 @@ interface NodeSummaryPanelProps {
 export const NodeSummaryPanel: React.FC<NodeSummaryPanelProps> = ({ nodeId, onClose }) => {
   const [node, setNode] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
     if (!nodeId) {
@@ -21,7 +23,7 @@ export const NodeSummaryPanel: React.FC<NodeSummaryPanelProps> = ({ nodeId, onCl
       return;
     }
     setLoading(true);
-    fetchNodeSummary(nodeId, null)
+    fetchNodeSummary(nodeId, token)
       .then((data) => setNode(data))
       .catch(() => setNode(null))
       .finally(() => setLoading(false));

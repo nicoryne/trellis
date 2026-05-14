@@ -1,6 +1,7 @@
 // apps/web/src/components/TopNav.tsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { logoutRequest } from '../api/auth';
 import { Logo } from './Logo';
@@ -12,7 +13,11 @@ const ROLE_LABELS: Record<string, string> = {
   knowledge_admin: 'Admin',
 };
 
-export function TopNav() {
+interface TopNavProps {
+  onMenuClick: () => void;
+}
+
+export function TopNav({ onMenuClick }: TopNavProps) {
   const navigate = useNavigate();
   const { user, token, logout } = useAuthStore();
 
@@ -25,6 +30,9 @@ export function TopNav() {
   return (
     <nav className="top-nav">
       <div className="top-nav-brand">
+        <button className="top-nav-menu-btn" onClick={onMenuClick} aria-label="Open navigation menu">
+          <Menu size={20} aria-hidden />
+        </button>
         <Logo size={22} />
         <span className="top-nav-wordmark">Trellis</span>
       </div>

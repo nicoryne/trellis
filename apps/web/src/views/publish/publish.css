@@ -49,6 +49,12 @@
   min-height: 0;
 }
 
+@media (max-width: 767px) {
+  .diff-panes {
+    grid-template-columns: 1fr;
+  }
+}
+
 .diff-pane {
   background: var(--bg-canvas);
   padding: 20px;

@@ -82,6 +82,8 @@ Accent palette swapped from amber-gold to orange. Concrete changes:
 | `accent-primary-bg` | (legacy tint) | `#2d1a06` |
 | Section 2.3 header | "Accent palette (amber/gold for institutional credibility)" | "Accent palette (orange for institutional credibility)" |
 | Strict-rule wording (§2.5) | "no graph node color may overlap with the accent palette (gold/amber)" | "no graph node color may overlap with the accent palette (orange)" |
+| `--node-witness` | `#ff9f1c` | `#ffd60a` (saffron — was too close to new orange accent) |
+| `--node-statute` | `#fb5607` | `#d62828` (crimson — was too close to new orange accent) |
 
 Propagated to: [[node-color-coding]] (palette rule + cited-edge color), [[query-overlay-animation]] (cited-edge illumination), [[insight-preservation-score]] (dot color label), [[hero-moments]] (confidence pill, preservation bar labels), [[rag-query-pipeline]] (confidence pill description), [[trellis-design-system]] (accent table + section heading), [[trellis-implementation-plan]] (G-2 active-state description), [[trellis-govern-implementation]] (token value), [[trellis-retrieval-implementation]] (cited-edge illumination). `raw/design-guidelines.md` and `raw/context-dump.md` left as-is per the immutability rule.
 

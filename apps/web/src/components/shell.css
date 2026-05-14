@@ -1,6 +1,29 @@
 /* apps/web/src/components/shell.css */
 
 /* ─── Top Nav ────────────────────────────────────────────────────────────── */
+
+/* Hamburger — hidden on desktop, shown on mobile */
+.top-nav-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--duration-fast) var(--easing-default),
+              background var(--duration-fast) var(--easing-default);
+}
+
+.top-nav-menu-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-raised);
+}
+
 .top-nav {
   position: sticky;
   top: 0;
@@ -176,6 +199,168 @@
 /* ─── Content Area ───────────────────────────────────────────────────────── */
 .content-area {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   background: var(--bg-canvas);
+}
+
+/* ─── Sidebar divider (between Personal / Team groups) ───────────────────── */
+.side-nav-divider {
+  display: none;
+  height: 1px;
+  background: var(--border-muted);
+  margin: 6px 12px;
+}
+
+/* ─── Sidebar footer / collapse toggle ───────────────────────────────────── */
+.side-nav-footer {
+  margin-top: auto;
+  padding: 8px 0 4px;
+  border-top: 1px solid var(--border-muted);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 12px;
+}
+
+.side-nav-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--easing-default),
+              background var(--duration-fast) var(--easing-default);
+}
+
+.side-nav-toggle:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-raised);
+}
+
+/* ─── Collapsed sidebar (desktop) ────────────────────────────────────────── */
+.side-nav--collapsed {
+  width: 56px;
+}
+
+.side-nav--collapsed .section-label {
+  display: none;
+}
+
+.side-nav--collapsed .side-nav-divider {
+  display: block;
+}
+
+.side-nav--collapsed .side-nav-item {
+  padding: 9px 0;
+  justify-content: center;
+  gap: 0;
+  margin: 0 6px;
+  width: calc(100% - 12px);
+}
+
+.side-nav--collapsed .side-nav-label {
+  display: none;
+}
+
+.side-nav--collapsed .side-nav-footer {
+  justify-content: center;
+  padding-right: 0;
+}
+
+/* ─── Mobile backdrop ────────────────────────────────────────────────────── */
+.mobile-backdrop {
+  display: none;
+}
+
+/* ─── Responsive breakpoint ──────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Show hamburger, hide user meta to save space */
+  .top-nav-menu-btn {
+    display: flex;
+  }
+
+  .top-nav-user,
+  .top-nav-role {
+    display: none;
+  }
+
+  /* Sidebar becomes a fixed off-canvas drawer */
+  .side-nav {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    bottom: 0;
+    z-index: 200;
+    width: 240px;
+    transform: translateX(-100%);
+    transition: transform var(--duration-default) var(--easing-default);
+    box-shadow: none;
+  }
+
+  .side-nav--mobile-open {
+    transform: translateX(0);
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Override collapsed styles — always show full nav on mobile */
+  .side-nav--collapsed {
+    width: 240px;
+    transform: translateX(-100%);
+  }
+
+  .side-nav--collapsed.side-nav--mobile-open {
+    transform: translateX(0);
+  }
+
+  .side-nav--collapsed .section-label {
+    display: block;
+  }
+
+  .side-nav--collapsed .side-nav-divider {
+    display: none;
+  }
+
+  .side-nav--collapsed .side-nav-item {
+    padding: 9px 20px;
+    justify-content: flex-start;
+    gap: 10px;
+    margin: 0 8px;
+    width: calc(100% - 16px);
+  }
+
+  .side-nav--collapsed .side-nav-label {
+    display: inline;
+  }
+
+  .side-nav--collapsed .side-nav-footer {
+    justify-content: flex-end;
+    padding-right: 12px;
+  }
+
+  /* Hide the desktop collapse toggle on mobile */
+  .side-nav-toggle {
+    display: none;
+  }
+
+  /* Backdrop */
+  .mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    top: 56px;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 199;
+    backdrop-filter: blur(2px);
+  }
+
+  /* Content area takes full width */
+  .app-body {
+    position: relative;
+  }
 }

@@ -549,6 +549,42 @@
   color: var(--danger);
 }
 
+/* ─── Mobile: reduce content padding ────────────────────────────────────── */
+@media (max-width: 767px) {
+  .capture-content {
+    padding: 20px 16px;
+  }
+
+  .editor-container {
+    max-width: 100%;
+  }
+
+  .graph-toolbar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .graph-search {
+    max-width: 100%;
+  }
+
+  .chat-messages {
+    padding: 16px;
+  }
+
+  .chat-input-area {
+    padding: 12px 16px 16px;
+  }
+
+  .chat-header {
+    padding: 16px 16px 12px;
+  }
+
+  .empty-state {
+    padding: 40px 20px;
+  }
+}
+
 /* ─── Image Preview ──────────────────────────────────────────────────────── */
 .image-preview {
   max-height: 256px;

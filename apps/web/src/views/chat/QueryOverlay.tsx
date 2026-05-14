@@ -5,6 +5,7 @@ import { fetchTeamGraph } from '../../api/chat';
 interface QueryOverlayProps {
   active: boolean;
   citedNodeIds: string[];
+  token?: string | null;
   onDismiss: () => void;
 }
 
@@ -20,54 +21,53 @@ const NODE_COLORS: Record<string, string> = {
   statute: '#d62828',
 };
 
-/* ── Timing constants (design-guidelines §8.3 / vault/concepts/query-overlay-animation.md) ── */
+const LOADING_MESSAGES = [
+  'Grepping knowledge...',
+  'Gathering context...',
+  'Reading firm memory...',
+  'Scanning precedents...',
+  'Connecting insights...',
+  'Mining case history...',
+  'Surfacing evidence...',
+  'Synthesizing findings...',
+  'Preparing content...',
+  'Assembling response...',
+];
+
+/* ── Timing constants ── */
 const FADE_IN_MS = 400;
-const PULSE_STAGGER_MS = 150; // Per cited node, in rank order
-const PULSE_DURATION_MS = 300; // One pulse: scale 1 → 1.15 → 1
+const PULSE_STAGGER_MS = 150;
+const PULSE_DURATION_MS = 300;
 const FADE_OUT_MS = 600;
 const ACCENT_RGB = '251, 133, 0';
 
-/** Deterministic jitter so node positions don't shift between frames. */
 function stableJitter(index: number, seed: number): number {
   const x = Math.sin(index * 9301 + seed * 49297) * 49297;
   return x - Math.floor(x);
 }
 
-/** Triangle pulse: 0 → 1 → 0 with peak at t=0.5. */
 function triangle(t: number): number {
   return 1 - Math.abs(2 * t - 1);
 }
 
-/** Smooth ease-out for opacity ramps. */
 function easeOut(t: number): number {
   return 1 - (1 - t) ** 3;
 }
 
-/**
- * QueryOverlay — Hero Moment 3 (design-guidelines §8.3,
- * vault/concepts/query-overlay-animation.md).
- *
- * Choreography:
- *   1. Backdrop fades in over 400ms (blur + dim)
- *   2. All nodes render at 15% opacity (the firm graph baseline)
- *   3. Cited nodes pulse to 100% in rank order, one every 150ms.
- *      Each pulse: scale 1.0 → 1.15 → 1.0 over 300ms, opacity 15% → 100%.
- *   4. Edges between cited nodes illuminate to accent-primary once BOTH
- *      endpoints have lit (progressive cited-path reveal).
- *   5. Holds until parent sets active=false → fade out over 600ms.
- *
- * Renderer: a single `<canvas>` with one rAF loop. Honors prefers-reduced-motion.
- */
+/** Six node-type colors in orbit ring order */
+const ORBIT_COLORS = ['#9d4edd', '#06d6a0', '#3a86ff', '#ef476f', '#ffd60a', '#118ab2'];
+
 export const QueryOverlay: React.FC<QueryOverlayProps> = ({
   active,
   citedNodeIds,
+  token,
   onDismiss,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [graphData, setGraphData] = useState<any>(null);
   const [visible, setVisible] = useState(false);
+  const [msgIdx, setMsgIdx] = useState(() => Math.floor(Math.random() * LOADING_MESSAGES.length));
 
-  // Animation phase state (refs — no React re-render per frame)
   const phaseRef = useRef<'in' | 'hold' | 'out'>('in');
   const phaseStartRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
@@ -78,12 +78,21 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
       : false
   );
 
-  // Fetch team graph once we're activated
+  // Fetch team graph once activated
   useEffect(() => {
     if (active && !graphData) {
-      fetchTeamGraph(null).then((data) => setGraphData(data));
+      fetchTeamGraph(token ?? null).then((data) => setGraphData(data));
     }
-  }, [active, graphData]);
+  }, [active, graphData, token]);
+
+  // Cycle loading messages while visible
+  useEffect(() => {
+    if (!visible) return;
+    const id = setInterval(() => {
+      setMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length);
+    }, 2200);
+    return () => clearInterval(id);
+  }, [visible]);
 
   // Escape key dismisses
   useEffect(() => {
@@ -95,9 +104,9 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
     return () => window.removeEventListener('keydown', handleKey);
   }, [active, onDismiss]);
 
-  // Drive phase transitions
+  // Become visible as soon as active (no waiting for graphData)
   useEffect(() => {
-    if (active && graphData && !visible) {
+    if (active && !visible) {
       setVisible(true);
       phaseRef.current = 'in';
       phaseStartRef.current = performance.now();
@@ -105,15 +114,14 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
       phaseRef.current = 'out';
       phaseStartRef.current = performance.now();
     }
-  }, [active, graphData, visible]);
+  }, [active, visible]);
 
-  // Single continuous rAF loop while visible
+  // Canvas rAF loop — only runs when graphData is available
   useEffect(() => {
     if (!visible || !graphData) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Pre-compute node layout once (avoid re-laying-out every frame)
     const layoutNodes = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
@@ -138,31 +146,19 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
     let lastW = window.innerWidth;
     let lastH = window.innerHeight;
 
-    // Indexed activation start time per cited node (rank order = array order)
     const activationStart = (citedIndex: number) =>
       FADE_IN_MS + citedIndex * PULSE_STAGGER_MS;
 
-    /**
-     * Per-node state at elapsed time.
-     * @returns { progress: 0..1, scale: 1..1.15..1, isLit: boolean }
-     */
     const nodeState = (nodeId: string, elapsed: number) => {
       const citedIndex = citedNodeIds.indexOf(nodeId);
-      if (citedIndex < 0) {
-        return { progress: 0, scale: 1, isLit: false };
-      }
-      // Reduced motion: snap to final state once fade-in completes
+      if (citedIndex < 0) return { progress: 0, scale: 1, isLit: false };
       if (prefersReducedMotion.current) {
         return { progress: elapsed > FADE_IN_MS ? 1 : 0, scale: 1, isLit: elapsed > FADE_IN_MS };
       }
       const start = activationStart(citedIndex);
-      if (elapsed < start) {
-        return { progress: 0, scale: 1, isLit: false };
-      }
+      if (elapsed < start) return { progress: 0, scale: 1, isLit: false };
       const local = Math.min((elapsed - start) / PULSE_DURATION_MS, 1);
-      const opacityProgress = easeOut(local);
-      const scale = 1 + 0.15 * triangle(local);
-      return { progress: opacityProgress, scale, isLit: local >= 1 };
+      return { progress: easeOut(local), scale: 1 + 0.15 * triangle(local), isLit: local >= 1 };
     };
 
     const ctx = canvas.getContext('2d');
@@ -172,19 +168,14 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
       const now = performance.now();
       const elapsed = now - phaseStartRef.current;
 
-      // Phase → overlay opacity envelope
       let envelope = 1;
       if (phaseRef.current === 'in') {
         envelope = Math.min(elapsed / FADE_IN_MS, 1);
       } else if (phaseRef.current === 'out') {
         envelope = Math.max(1 - elapsed / FADE_OUT_MS, 0);
-        if (envelope <= 0) {
-          setVisible(false);
-          return;
-        }
+        if (envelope <= 0) { setVisible(false); return; }
       }
 
-      // Re-size canvas if viewport changed
       if (window.innerWidth !== lastW || window.innerHeight !== lastH) {
         lastW = window.innerWidth;
         lastH = window.innerHeight;
@@ -203,17 +194,16 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
       const nodes = graphData.nodes ?? [];
       const edges = graphData.edges ?? [];
 
-      // Edges first (so nodes render on top)
       for (const edge of edges) {
         const src = positions.get(edge.source_node_id);
         const tgt = positions.get(edge.target_node_id);
         if (!src || !tgt) continue;
-
         const srcState = nodeState(edge.source_node_id, elapsed);
         const tgtState = nodeState(edge.target_node_id, elapsed);
-        const isCitedEdge = srcState.isLit && tgtState.isLit ||
-          (srcState.progress > 0 && tgtState.progress > 0 && citedNodeIds.includes(edge.source_node_id) && citedNodeIds.includes(edge.target_node_id));
-        // Edge progress = min of endpoint progresses (both must light up first)
+        const isCitedEdge =
+          srcState.isLit && tgtState.isLit ||
+          (srcState.progress > 0 && tgtState.progress > 0 &&
+            citedNodeIds.includes(edge.source_node_id) && citedNodeIds.includes(edge.target_node_id));
         const edgeProgress = Math.min(srcState.progress, tgtState.progress);
 
         ctx.beginPath();
@@ -233,27 +223,17 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
         }
       }
 
-      // Nodes
       const baseSize = 5;
       const litSize = 9;
       for (const node of nodes) {
         const pos = positions.get(node.id);
         if (!pos) continue;
-
         const color = NODE_COLORS[node.node_type] ?? '#7d8590';
         const state = nodeState(node.id, elapsed);
         const isCited = citedNodeIds.includes(node.id);
+        const nodeOpacity = isCited ? (0.15 + 0.85 * state.progress) * envelope : 0.15 * envelope;
+        const size = isCited ? (baseSize + (litSize - baseSize) * state.progress) * state.scale : baseSize;
 
-        // Opacity: non-cited stays at 15%; cited ramps 15% → 100% via state.progress
-        const nodeOpacity = isCited
-          ? (0.15 + 0.85 * state.progress) * envelope
-          : 0.15 * envelope;
-        // Size: non-cited stays small; cited grows then pulses
-        const size = isCited
-          ? (baseSize + (litSize - baseSize) * state.progress) * state.scale
-          : baseSize;
-
-        // Outer glow halo for cited nodes once they've lit
         if (isCited && state.progress > 0.4) {
           ctx.beginPath();
           ctx.arc(pos.x, pos.y, size + 6, 0, Math.PI * 2);
@@ -277,24 +257,30 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
     return () => cancelAnimationFrame(rafRef.current);
   }, [visible, graphData, citedNodeIds]);
 
+  // When no graphData, still handle the out-phase collapse
+  useEffect(() => {
+    if (!visible || graphData) return;
+    if (phaseRef.current !== 'out') return;
+
+    const id = setTimeout(() => setVisible(false), FADE_OUT_MS);
+    return () => clearTimeout(id);
+  }, [visible, graphData, phaseRef.current]);
+
   if (!visible) return null;
 
-  // Container drives the React-level fade for the backdrop only.
-  // The canvas paints its own time-based envelope, so this fade is purely
-  // for the backdrop blur container (subtle, but lets us use motion).
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
+      transition={{ duration: 0.25 }}
       style={{
         position: 'fixed',
         inset: 0,
         zIndex: 900,
-        backgroundColor: 'rgba(13, 17, 23, 0.92)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        backgroundColor: 'rgba(13, 17, 23, 0.94)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -303,67 +289,157 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
       onClick={onDismiss}
       role="presentation"
     >
-      <canvas
-        ref={canvasRef}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          pointerEvents: 'none',
-        }}
-        aria-hidden
-      />
-
-      {/* Status label */}
-      <AnimatePresence>
-        <motion.div
-          key="label"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.4, ease: [0, 0, 0.2, 1], delay: 0.2 }}
+      {/* Canvas graph (shown when graphData is loaded) */}
+      {graphData && (
+        <canvas
+          ref={canvasRef}
           style={{
             position: 'absolute',
-            bottom: '56px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            fontFamily: 'var(--font-sans)',
-            fontSize: '12px',
-            color: 'var(--text-secondary)',
-            letterSpacing: '0.22em',
-            textTransform: 'uppercase',
+            inset: 0,
+            width: '100%',
+            height: '100%',
             pointerEvents: 'none',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 12,
           }}
-        >
-          Searching firm knowledge
-          <span style={{ display: 'inline-flex', gap: 4 }}>
-            {[0, 1, 2].map((i) => (
-              <motion.span
-                key={i}
-                animate={{ opacity: [0.25, 1, 0.25] }}
-                transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.18, ease: 'easeInOut' }}
-                style={{
-                  width: 3,
-                  height: 3,
-                  borderRadius: 999,
-                  background: 'var(--accent-primary)',
-                  display: 'inline-block',
-                }}
-              />
-            ))}
-          </span>
-        </motion.div>
-      </AnimatePresence>
+          aria-hidden
+        />
+      )}
 
-      {/* Escape hint */}
+      {/* Framer orbit animation — shown while waiting for graph data */}
+      {!graphData && (
+        <div
+          style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}
+          aria-hidden
+        >
+          <div style={{ position: 'relative', width: 160, height: 160 }}>
+            {/* Outer faint ring */}
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: '50%',
+                border: '1px solid rgba(251, 133, 0, 0.08)',
+              }}
+            />
+            {/* Mid ring */}
+            <motion.div
+              animate={{ rotate: -360 }}
+              transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
+              style={{
+                position: 'absolute',
+                inset: 20,
+                borderRadius: '50%',
+                border: '1px solid rgba(251, 133, 0, 0.12)',
+              }}
+            />
+            {/* Orbiting colored nodes */}
+            {ORBIT_COLORS.map((color, i) => {
+              const orbitRadius = i % 2 === 0 ? 68 : 52;
+              const duration = 6 + i * 1.4;
+              const delay = (i / ORBIT_COLORS.length) * -duration;
+              return (
+                <motion.div
+                  key={i}
+                  animate={{ rotate: 360 }}
+                  transition={{ duration, repeat: Infinity, ease: 'linear', delay }}
+                  style={{ position: 'absolute', inset: 0 }}
+                >
+                  <motion.div
+                    animate={{ scale: [0.85, 1.2, 0.85], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: duration * 0.7, repeat: Infinity, ease: 'easeInOut', delay: i * 0.3 }}
+                    style={{
+                      position: 'absolute',
+                      top: `calc(50% - ${orbitRadius}px - 4px)`,
+                      left: 'calc(50% - 4px)',
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      backgroundColor: color,
+                      boxShadow: `0 0 8px ${color}88`,
+                    }}
+                  />
+                </motion.div>
+              );
+            })}
+            {/* Center pulse node */}
+            <motion.div
+              animate={{ scale: [1, 1.4, 1], opacity: [0.6, 1, 0.6] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                backgroundColor: '#fb8500',
+                boxShadow: '0 0 16px rgba(251, 133, 0, 0.7)',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Cycling status label */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '56px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          pointerEvents: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 16,
+        }}
+      >
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={msgIdx}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.35, ease: [0, 0, 0.2, 1] }}
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: '12px',
+              color: 'var(--text-secondary)',
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {LOADING_MESSAGES[msgIdx]}
+          </motion.span>
+        </AnimatePresence>
+
+        {/* Pulsing dots */}
+        <span style={{ display: 'inline-flex', gap: 5 }}>
+          {[0, 1, 2].map((i) => (
+            <motion.span
+              key={i}
+              animate={{ opacity: [0.2, 1, 0.2] }}
+              transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.22, ease: 'easeInOut' }}
+              style={{
+                width: 4,
+                height: 4,
+                borderRadius: 999,
+                background: 'var(--accent-primary)',
+                display: 'inline-block',
+              }}
+            />
+          ))}
+        </span>
+      </div>
+
+      {/* ESC hint */}
       <motion.div
         initial={{ opacity: 0 }}
-        animate={{ opacity: 0.6 }}
-        transition={{ delay: 1.2, duration: 0.4 }}
+        animate={{ opacity: 0.5 }}
+        transition={{ delay: 1.5, duration: 0.4 }}
         style={{
           position: 'absolute',
           top: 24,

@@ -1,7 +1,7 @@
 // apps/web/src/components/SideNav.tsx
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Network, PenLine, Users, MessageSquare } from 'lucide-react';
+import { Network, PenLine, Users, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'motion/react';
 
 const CAPTURE_ITEMS = [
@@ -19,16 +19,18 @@ interface NavItemProps {
   label: string;
   Icon: React.ComponentType<{ size?: number; 'aria-hidden'?: boolean }>;
   active: boolean;
+  collapsed: boolean;
   onClick: () => void;
 }
 
-function NavItem({ path: _path, label, Icon, active, onClick }: NavItemProps) {
+function NavItem({ path: _path, label, Icon, active, collapsed, onClick }: NavItemProps) {
   return (
     <button
       className={`side-nav-item${active ? ' active' : ''}`}
       onClick={onClick}
       aria-label={label}
       aria-current={active ? 'page' : undefined}
+      title={collapsed ? label : undefined}
     >
       {active && (
         <motion.span
@@ -43,31 +45,64 @@ function NavItem({ path: _path, label, Icon, active, onClick }: NavItemProps) {
   );
 }
 
-export function SideNav() {
+interface SideNavProps {
+  collapsed: boolean;
+  mobileOpen: boolean;
+  onToggleCollapsed: () => void;
+  onMobileClose: () => void;
+}
+
+export function SideNav({ collapsed, mobileOpen, onToggleCollapsed, onMobileClose }: SideNavProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
+  function handleNav(path: string) {
+    navigate(path);
+    onMobileClose();
+  }
+
+  const cls = [
+    'side-nav',
+    collapsed ? 'side-nav--collapsed' : '',
+    mobileOpen ? 'side-nav--mobile-open' : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <aside className="side-nav">
+    <aside className={cls}>
       <div className="section-label">Personal</div>
       {CAPTURE_ITEMS.map((item) => (
         <NavItem
           key={item.path}
           {...item}
+          collapsed={collapsed}
           active={pathname === item.path}
-          onClick={() => navigate(item.path)}
+          onClick={() => handleNav(item.path)}
         />
       ))}
 
+      <div className="side-nav-divider" />
       <div className="section-label">Team</div>
       {TEAM_ITEMS.map((item) => (
         <NavItem
           key={item.path}
           {...item}
+          collapsed={collapsed}
           active={pathname === item.path}
-          onClick={() => navigate(item.path)}
+          onClick={() => handleNav(item.path)}
         />
       ))}
+
+      <div className="side-nav-footer">
+        <button
+          className="side-nav-toggle"
+          onClick={onToggleCollapsed}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed
+            ? <ChevronRight size={16} aria-hidden />
+            : <ChevronLeft size={16} aria-hidden />}
+        </button>
+      </div>
     </aside>
   );
 }

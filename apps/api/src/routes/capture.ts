@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
-import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { auth } from '../middleware/auth';
 import { organizeNote } from '../services/organize';
@@ -11,7 +10,6 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 const organizeSchema = z.object({
@@ -42,11 +40,12 @@ router.post('/transcribe', upload.single('audio'), auth, async (req: Request, re
     });
   }
   try {
-    const transcription = await openai.audio.transcriptions.create({
-      file: new File([new Uint8Array(req.file.buffer)], req.file.originalname, { type: req.file.mimetype }),
-      model: 'whisper-1',
-    });
-    return res.json({ data: { transcript: transcription.text } });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const result = await model.generateContent([
+      'Transcribe this audio exactly as spoken. Return only the transcription text, no commentary or formatting.',
+      { inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype } },
+    ]);
+    return res.json({ data: { transcript: result.response.text().trim() } });
   } catch {
     return res.status(500).json({
       error: { code: 'TRANSCRIPTION_ERROR', message: 'Transcription failed', retryable: true },
