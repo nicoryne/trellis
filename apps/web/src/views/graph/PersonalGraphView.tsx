@@ -8,6 +8,7 @@ import {
   notesToCytoscapeElements,
   EDGE_COLOR_HOVER,
 } from '../../lib/graphUtils';
+import { createPhysicsRunner, type PhysicsRunner } from '../../lib/graphPhysics';
 import { Logo } from '../../components/Logo';
 import { GraphZoomControl } from '../../components/GraphZoomControl';
 
@@ -25,8 +26,7 @@ export default function PersonalGraphView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
   const baseZoomRef = useRef<number>(1);
-  const simRafRef = useRef<number>(0);
-  const velRef = useRef<Map<string, [number, number]>>(new Map());
+  const physicsRef = useRef<PhysicsRunner | null>(null);
   const pinnedRef = useRef<Set<string>>(new Set());
   const searchRef = useRef('');
   const navigate = useNavigate();
@@ -236,76 +236,9 @@ export default function PersonalGraphView() {
         n.style({ width: r * 2, height: r * 2 });
       });
 
-      // Init velocities
-      cy.nodes().forEach(n => { velRef.current.set(n.id(), [0, 0]); });
-
-      const vel = velRef.current;
-      const pinned = pinnedRef.current;
-
-      // Continuous breathing simulation — four forces per node per frame
-      const tick = (time: number) => {
-        const cxP = cy.width() / 2;
-        const cyP = cy.height() / 2;
-
-        const allPos = new Map<string, { x: number; y: number }>();
-        cy.nodes().forEach(n => { allPos.set(n.id(), { ...n.position() }); });
-
-        cy.batch(() => {
-          cy.nodes().forEach(n => {
-            const id = n.id();
-            if (pinned.has(id)) return;
-
-            const pos = allPos.get(id)!;
-            let fx = 0, fy = 0;
-
-            // 1. Center pull
-            fx += (cxP - pos.x) * 0.0004;
-            fy += (cyP - pos.y) * 0.0004;
-
-            // 2. Breathing — unique sinusoidal phase per node
-            const seed = id.split('').reduce((a, c, i) => a + c.charCodeAt(0) * (i + 1), 0) * 0.037;
-            fx += Math.sin(time * 0.00065 + seed) * 0.022;
-            fy += Math.cos(time * 0.00083 + seed * 1.37) * 0.022;
-
-            // 3. Mutual repulsion
-            cy.nodes().forEach(m => {
-              const mid = m.id();
-              if (mid === id) return;
-              const mp = allPos.get(mid);
-              if (!mp) return;
-              const dx = pos.x - mp.x, dy = pos.y - mp.y;
-              const d2 = Math.max(dx * dx + dy * dy, 4);
-              const d = Math.sqrt(d2);
-              fx += (dx / d) * (450 / d2);
-              fy += (dy / d) * (450 / d2);
-            });
-
-            // 4. Edge springs — preferred rest length 75px
-            n.connectedEdges().forEach(e => {
-              const other = e.source().id() === id ? e.target() : e.source();
-              const op = allPos.get(other.id());
-              if (!op) return;
-              const dx = op.x - pos.x, dy = op.y - pos.y;
-              const d = Math.sqrt(dx * dx + dy * dy) || 1;
-              const stretch = (d - 75) * 0.015;
-              fx += (dx / d) * stretch;
-              fy += (dy / d) * stretch;
-            });
-
-            const v = vel.get(id) ?? [0, 0];
-            let vx = v[0] * 0.88 + fx;
-            let vy = v[1] * 0.88 + fy;
-            const spd = Math.sqrt(vx * vx + vy * vy);
-            if (spd > 0.65) { vx = (vx / spd) * 0.65; vy = (vy / spd) * 0.65; }
-            vel.set(id, [vx, vy]);
-            n.position({ x: pos.x + vx, y: pos.y + vy });
-          });
-        });
-
-        simRafRef.current = requestAnimationFrame(tick);
-      };
-
-      simRafRef.current = requestAnimationFrame(tick);
+      // Obsidian-style force simulation: settles to equilibrium, pauses at rest
+      physicsRef.current = createPhysicsRunner(cy, (id) => pinnedRef.current.has(id));
+      physicsRef.current.start();
     };
     cy.one('layoutstop', onLayoutStop);
 
@@ -335,7 +268,8 @@ export default function PersonalGraphView() {
 
     cy.on('free', 'node', (e) => {
       const id = e.target.id();
-      velRef.current.set(id, [dragVX * 0.35, dragVY * 0.35]);
+      // Inject drag momentum and wake the simulation
+      physicsRef.current?.setNodeVelocity(id, dragVX * 0.35, dragVY * 0.35);
       pinnedRef.current.delete(id);
       dragLastPos = null; dragVX = 0; dragVY = 0;
     });
@@ -414,7 +348,8 @@ export default function PersonalGraphView() {
 
     return () => {
       layout.stop();
-      cancelAnimationFrame(simRafRef.current);
+      physicsRef.current?.stop();
+      physicsRef.current = null;
       cy.destroy();
       cyRef.current = null;
     };
