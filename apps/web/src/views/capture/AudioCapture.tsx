@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Mic } from 'lucide-react';
 import WaveSurfer from 'wavesurfer.js';
 import { startRecording, formatDuration, MAX_RECORDING_DURATION, type Recording } from '../../lib/audio';
 import { transcribeAudio, organizeNote } from '../../api/client';
@@ -107,74 +108,67 @@ export default function AudioCapture() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto flex flex-col gap-6">
+    <div className="editor-container">
       {state === 'idle' && (
-        <div className="flex flex-col items-center gap-4 py-12">
+        <div className="audio-idle">
           <button
             onClick={handleStart}
-            className="w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-transform hover:scale-105 active:scale-95"
-            style={{ backgroundColor: 'var(--accent-primary)', color: '#0d1117' }}
+            className="audio-record-btn"
             aria-label="Start recording"
           >
-            ●
+            <Mic size={28} />
           </button>
-          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Click to record (max 5 min)
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--text-secondary)' }}>
+            Tap to record a voice note
+          </span>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)' }}>
+            Max 5 minutes. Audio is transcribed via Whisper.
           </span>
         </div>
       )}
 
       {state === 'recording' && (
-        <div className="flex flex-col items-center gap-4">
-          <div ref={waveContainerRef} className="w-full rounded" />
-          <div className="text-2xl font-mono tabular-nums" style={{ color: 'var(--accent-primary)' }}>
+        <div className="audio-recording">
+          <div className="audio-recording-indicator">
+            <span className="audio-recording-dot" />
+            Recording
+          </div>
+          <div ref={waveContainerRef} style={{ width: '100%', borderRadius: 8 }} />
+          <div className="audio-timer">
             {formatDuration(duration)}
           </div>
-          <button
-            onClick={handleStop}
-            className="px-6 py-2 rounded text-sm font-medium"
-            style={{ backgroundColor: 'var(--danger)', color: '#fff' }}
-          >
+          <button onClick={handleStop} className="btn" style={{ background: 'var(--danger)', color: '#fff', padding: '10px 24px', fontSize: 14 }}>
             Stop recording
           </button>
         </div>
       )}
 
       {state === 'transcribing' && (
-        <div className="flex flex-col items-center gap-4 py-12">
-          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Transcribing...
+        <div className="audio-idle">
+          <span className="spinner" style={{ width: 24, height: 24 }} />
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--text-secondary)' }}>
+            Transcribing audio...
           </span>
         </div>
       )}
 
       {state === 'editing' && (
-        <div className="flex flex-col gap-4">
-          <label className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <label style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' as const, color: 'var(--text-muted)' }}>
             Transcript — edit before saving
           </label>
           <textarea
             value={transcript}
             onChange={e => setTranscript(e.target.value)}
-            className="w-full min-h-64 p-4 rounded border bg-transparent resize-none text-base leading-relaxed"
-            style={{
-              borderColor: 'var(--border-default)',
-              color: 'var(--text-primary)',
-              backgroundColor: 'var(--bg-surface)',
-            }}
+            className="transcript-editor"
           />
-          <div className="flex gap-3">
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 rounded text-sm font-medium"
-              style={{ backgroundColor: 'var(--accent-primary)', color: '#0d1117' }}
-            >
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button onClick={handleSave} className="btn btn--primary">
               Save note
             </button>
             <button
               onClick={() => { setState('idle'); setTranscript(''); setDuration(0); blobRef.current = null; }}
-              className="px-4 py-2 rounded text-sm"
-              style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-surface)' }}
+              className="btn btn--secondary"
             >
               Discard
             </button>
@@ -183,30 +177,16 @@ export default function AudioCapture() {
       )}
 
       {error && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm" style={{ color: 'var(--danger)' }}>{error}</span>
-          <button
-            onClick={() => setError(null)}
-            className="text-sm underline"
-            style={{ color: 'var(--accent-primary)' }}
-          >
-            Dismiss
-          </button>
+        <div className="error-inline" style={{ marginTop: 16 }}>
+          <span className="error-inline-text">{error}</span>
+          <button onClick={() => setError(null)} className="btn btn--danger-text">Dismiss</button>
         </div>
       )}
 
       {organizeError && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs" style={{ color: 'var(--danger)' }}>
-            Organization failed
-          </span>
-          <button
-            onClick={() => setOrganizeError(null)}
-            className="text-xs underline"
-            style={{ color: 'var(--accent-primary)' }}
-          >
-            Dismiss
-          </button>
+        <div className="error-inline" style={{ marginTop: 12 }}>
+          <span className="error-inline-text">Organization failed</span>
+          <button onClick={() => setOrganizeError(null)} className="btn btn--danger-text">Dismiss</button>
         </div>
       )}
     </div>

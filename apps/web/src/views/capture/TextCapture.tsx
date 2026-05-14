@@ -68,51 +68,39 @@ export default function TextCapture() {
   }, []);
 
   return (
-    <div className="max-w-3xl mx-auto flex flex-col gap-4">
+    <div className="editor-container">
       <input
         autoFocus
         type="text"
         placeholder="Note title"
         value={title}
         onChange={e => { setTitle(e.target.value); scheduleSave(e.target.value, body); }}
-        className="w-full bg-transparent text-2xl font-semibold outline-none border-b pb-2"
-        style={{
-          color: 'var(--text-primary)',
-          borderColor: 'var(--border-muted)',
-          caretColor: 'var(--accent-primary)',
-        }}
+        className="editor-title"
       />
 
       <textarea
-        placeholder="Start writing..."
+        placeholder="Start writing your observation, strategy, or lesson learned..."
         value={body}
         onChange={e => { setBody(e.target.value); scheduleSave(title, e.target.value); }}
-        className="w-full min-h-96 bg-transparent outline-none resize-none text-base leading-relaxed"
-        style={{ color: 'var(--text-primary)', caretColor: 'var(--accent-primary)' }}
+        className="editor-body"
       />
 
       {activeNote && activeNote.extractedEntities.length > 0 && (
-        <div
-          className="flex flex-wrap gap-2 pt-3 border-t"
-          style={{ borderColor: 'var(--border-muted)' }}
-        >
+        <div className="entity-chips">
           {activeNote.extractedEntities.map(entity => (
-            <span
-              key={entity.id}
-              className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-mono"
-              style={{
-                backgroundColor: 'var(--accent-primary-bg)',
-                color: ENTITY_COLORS[entity.type] ?? 'var(--text-primary)',
-                border: `1px solid ${ENTITY_COLORS[entity.type] ?? 'var(--border-default)'}`,
-              }}
-            >
-              {entity.type}: {entity.name}
+            <span key={entity.id} className="entity-chip">
+              <span
+                className="entity-chip-dot"
+                style={{ backgroundColor: ENTITY_COLORS[entity.type] ?? 'var(--text-muted)' }}
+              />
+              <span style={{ color: ENTITY_COLORS[entity.type] ?? 'var(--text-primary)' }}>
+                {entity.name}
+              </span>
               <button
                 type="button"
                 onClick={() => removeEntity(activeNote.id, entity.id)}
                 aria-label={`Remove entity ${entity.name}`}
-                className="leading-none px-1 rounded opacity-60 hover:opacity-100"
-                style={{ color: 'inherit', background: 'transparent' }}
+                className="entity-chip-remove"
               >
                 ×
               </button>
@@ -122,47 +110,39 @@ export default function TextCapture() {
       )}
 
       {activeNote?.isPrivileged && (
-        <div
-          className="text-xs px-3 py-1.5 rounded"
-          style={{ backgroundColor: 'var(--accent-primary-bg)', color: 'var(--accent-primary)' }}
-        >
+        <div className="status-badge status-badge--privilege" style={{ marginTop: 16 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           Attorney-client privileged content detected
         </div>
       )}
 
-      {/* Publish to team graph button — visible when note is saved and not already published */}
-      {activeNote && !activeNote.isPublished && activeNote.body.trim().length > 0 && (
-        <button
-          onClick={() => setShowRedaction(true)}
-          className="px-4 py-2 rounded text-sm font-medium self-start"
-          style={{ backgroundColor: 'var(--accent-primary)', color: '#0d1117' }}
-        >
-          Publish to team graph
-        </button>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 20 }}>
+        {/* Publish to team graph button — visible when note is saved and not already published */}
+        {activeNote && !activeNote.isPublished && activeNote.body.trim().length > 0 && (
+          <button onClick={() => setShowRedaction(true)} className="btn btn--primary">
+            Publish to team graph
+          </button>
+        )}
 
-      {activeNote?.isPublished && (
-        <span className="text-xs px-3 py-1.5 rounded" style={{ backgroundColor: 'rgba(63,185,80,0.1)', color: 'var(--success)' }}>
-          Published
-        </span>
-      )}
+        {activeNote?.isPublished && (
+          <span className="status-badge status-badge--published">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Published
+          </span>
+        )}
 
-      {isOrganizing && (
-        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Organizing...
-        </span>
-      )}
+        {isOrganizing && (
+          <span className="status-badge status-badge--organizing" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <span className="spinner" />
+            Organizing...
+          </span>
+        )}
+      </div>
 
       {organizeError && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs" style={{ color: 'var(--danger)' }}>
-            Organization failed
-          </span>
-          <button
-            onClick={() => performSave(title, body)}
-            className="text-xs underline"
-            style={{ color: 'var(--accent-primary)' }}
-          >
+        <div className="error-inline" style={{ marginTop: 12 }}>
+          <span className="error-inline-text">Organization failed</span>
+          <button onClick={() => performSave(title, body)} className="btn btn--danger-text">
             Retry
           </button>
         </div>

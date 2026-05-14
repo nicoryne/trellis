@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Upload } from 'lucide-react';
 import { analyzeImage, organizeNote } from '../../api/client';
 import { useNoteStore } from '../../store/noteStore';
 import { useAuthStore } from '../../store/authStore';
@@ -98,7 +99,7 @@ export default function ImageCapture() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto flex flex-col gap-6">
+    <div className="editor-container">
       {state === 'idle' && (
         // Fix 6: Keyboard accessibility for drop zone
         <div
@@ -109,68 +110,59 @@ export default function ImageCapture() {
           role="button"
           tabIndex={0}
           aria-label="Upload image"
-          className="border-2 border-dashed rounded-lg p-12 flex flex-col items-center gap-3 cursor-pointer transition-colors hover:border-amber-500"
-          style={{ borderColor: 'var(--border-default)' }}
+          className="drop-zone"
         >
           {/* Fix 9: Derive accept attribute from ACCEPTED_TYPES */}
           <input
             ref={inputRef}
             type="file"
             accept={ACCEPTED_TYPES.join(',')}
-            className="hidden"
+            style={{ display: 'none' }}
             onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
           />
-          <span className="text-lg" style={{ color: 'var(--text-secondary)' }}>
+          <div className="drop-zone-icon">
+            <Upload size={22} />
+          </div>
+          <span className="drop-zone-title">
             Drop an image or click to upload
           </span>
-          <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            PNG, JPG, WebP · max 10MB
+          <span className="drop-zone-subtitle">
+            PNG, JPG, WebP — max 10MB
           </span>
         </div>
       )}
 
       {state === 'analyzing' && (
-        <div className="flex flex-col items-center gap-4 py-12">
+        <div className="audio-idle">
           {preview && (
-            <img src={preview} alt="Uploaded" className="max-h-64 rounded object-contain" />
+            <img src={preview} alt="Uploaded" className="image-preview" />
           )}
-          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+          <span className="spinner" style={{ width: 24, height: 24 }} />
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--text-secondary)' }}>
             Analyzing image...
           </span>
         </div>
       )}
 
       {state === 'editing' && (
-        <div className="flex flex-col gap-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {preview && (
-            <img src={preview} alt="Uploaded" className="max-h-48 rounded object-contain self-start" />
+            <img src={preview} alt="Uploaded" className="image-preview image-preview--small" style={{ alignSelf: 'flex-start' }} />
           )}
-          <label className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+          <label style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' as const, color: 'var(--text-muted)' }}>
             Extracted text — edit before saving
           </label>
           <textarea
             value={text}
             onChange={e => setText(e.target.value)}
-            className="w-full min-h-48 p-4 rounded border bg-transparent resize-none text-base leading-relaxed"
-            style={{
-              borderColor: 'var(--border-default)',
-              color: 'var(--text-primary)',
-              backgroundColor: 'var(--bg-surface)',
-            }}
+            className="transcript-editor"
+            style={{ minHeight: 200 }}
           />
-          <div className="flex gap-3">
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 rounded text-sm font-medium"
-              style={{ backgroundColor: 'var(--accent-primary)', color: '#0d1117' }}
-            >
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button onClick={handleSave} className="btn btn--primary">
               Save note
             </button>
-            <button
-              onClick={reset}
-              className="px-4 py-2 rounded text-sm"
-              style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-surface)' }}
-            >
+            <button onClick={reset} className="btn btn--secondary">
               Discard
             </button>
           </div>
@@ -178,31 +170,17 @@ export default function ImageCapture() {
       )}
 
       {error && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm" style={{ color: 'var(--danger)' }}>{error}</span>
+        <div className="error-inline" style={{ marginTop: 16 }}>
+          <span className="error-inline-text">{error}</span>
           {/* Fix 1C: Call reset() directly instead of inline mutation */}
-          <button
-            onClick={reset}
-            className="text-sm underline"
-            style={{ color: 'var(--accent-primary)' }}
-          >
-            Dismiss
-          </button>
+          <button onClick={reset} className="btn btn--danger-text">Dismiss</button>
         </div>
       )}
 
       {organizeError && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs" style={{ color: 'var(--danger)' }}>
-            Organization failed
-          </span>
-          <button
-            onClick={() => setOrganizeError(null)}
-            className="text-xs underline"
-            style={{ color: 'var(--accent-primary)' }}
-          >
-            Dismiss
-          </button>
+        <div className="error-inline" style={{ marginTop: 12 }}>
+          <span className="error-inline-text">Organization failed</span>
+          <button onClick={() => setOrganizeError(null)} className="btn btn--danger-text">Dismiss</button>
         </div>
       )}
     </div>

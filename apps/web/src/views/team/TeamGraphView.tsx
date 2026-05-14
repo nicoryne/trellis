@@ -61,47 +61,106 @@ export function TeamGraphView() {
           selector: 'node',
           style: {
             'background-color': (el) => NODE_COLORS[el.data('nodeType')] ?? '#7d8590',
-            'width': 24,
-            'height': 24,
-            'label': 'data(label)',
+            'background-opacity': 0.9,
+            width: 14,
+            height: 14,
+            label: 'data(label)',
             'font-size': 11,
             'font-family': 'Inter, system-ui, sans-serif',
-            'color': '#7d8590',
+            'font-weight': 400,
+            color: '#8b949e',
             'text-valign': 'bottom',
-            'text-margin-y': 4,
+            'text-halign': 'center',
+            'text-margin-y': 6,
             'text-max-width': '120px',
-            'text-overflow-wrap': 'whitespace',
-            'border-width': 1,
-            'border-color': '#30363d',
+            'text-wrap': 'ellipsis',
+            'text-outline-color': '#0d1117',
+            'text-outline-width': 2,
+            'text-outline-opacity': 0.8,
+            'border-width': 0,
+            // Obsidian-style glow
+            'shadow-blur': 12,
+            'shadow-color': (el) => NODE_COLORS[el.data('nodeType')] ?? '#7d8590',
+            'shadow-offset-x': 0,
+            'shadow-offset-y': 0,
+            'shadow-opacity': 0.6,
+            'overlay-opacity': 0,
+          },
+        },
+        {
+          selector: 'node:active, node:grabbed',
+          style: {
+            width: 18,
+            height: 18,
+            'shadow-blur': 20,
+            'shadow-opacity': 0.85,
+            'background-opacity': 1,
           },
         },
         {
           selector: 'node:selected',
           style: {
-            'width': 32,
-            'height': 32,
+            width: 20,
+            height: 20,
             'border-color': '#d4a72c',
             'border-width': 2,
-          },
-        },
-        {
-          selector: 'node:hover',
-          style: {
-            'border-color': '#e6edf3',
+            'shadow-blur': 24,
+            'shadow-opacity': 0.9,
+            'background-opacity': 1,
+            color: '#e6edf3',
           },
         },
         {
           selector: 'edge',
           style: {
-            'width': 1,
-            'line-color': '#30363d',
+            width: 0.75,
+            'line-color': '#21262d',
             'curve-style': 'bezier',
+            opacity: 0.35,
+            'overlay-opacity': 0,
+          },
+        },
+        {
+          selector: 'edge:selected',
+          style: {
+            'line-color': '#7d8590',
+            opacity: 0.8,
+            width: 1.5,
           },
         },
       ],
       layout: { name: 'cose', animate: true, animationDuration: 600, padding: 40 },
       userZoomingEnabled: true,
       userPanningEnabled: true,
+    });
+
+    // Hover glow — Cytoscape uses canvas, CSS :hover doesn't apply
+    cy.on('mouseover', 'node', (e) => {
+      const node = e.target;
+      node.style({
+        width: 18,
+        height: 18,
+        'shadow-blur': 22,
+        'shadow-opacity': 0.85,
+        'background-opacity': 1,
+        color: '#e6edf3',
+      });
+      node.connectedEdges().style({ opacity: 0.6, 'line-color': '#30363d', width: 1 });
+    });
+
+    cy.on('mouseout', 'node', (e) => {
+      const node = e.target;
+      if (!node.selected()) {
+        node.style({
+          width: 14,
+          height: 14,
+          'shadow-blur': 12,
+          'shadow-opacity': 0.6,
+          'background-opacity': 0.9,
+          color: '#8b949e',
+        });
+        node.connectedEdges().style({ opacity: 0.35, 'line-color': '#21262d', width: 0.75 });
+      }
     });
 
     cy.on('tap', 'node', (e) => {

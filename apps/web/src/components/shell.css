@@ -1,4 +1,6 @@
 /* apps/web/src/components/shell.css */
+
+/* ─── Top Nav ────────────────────────────────────────────────────────────── */
 .top-nav {
   position: sticky;
   top: 0;
@@ -10,13 +12,15 @@
   padding: 0 24px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
+  backdrop-filter: blur(8px);
 }
 
 .top-nav-wordmark {
   font-family: var(--font-serif);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--accent-primary);
+  letter-spacing: -0.01em;
 }
 
 .top-nav-right {
@@ -28,7 +32,18 @@
 .top-nav-user {
   font-family: var(--font-sans);
   font-size: 13px;
+  font-weight: 500;
   color: var(--text-secondary);
+}
+
+.top-nav-role {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-surface-raised);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-muted);
 }
 
 .top-nav-logout {
@@ -38,55 +53,74 @@
   color: var(--text-secondary);
   font-family: var(--font-sans);
   font-size: 13px;
-  padding: 5px 12px;
+  font-weight: 500;
+  padding: 6px 14px;
   cursor: pointer;
-  transition: color var(--duration-fast), border-color var(--duration-fast);
+  transition: color var(--duration-fast) var(--easing-default),
+              border-color var(--duration-fast) var(--easing-default),
+              background var(--duration-fast) var(--easing-default);
 }
 
 .top-nav-logout:hover {
   color: var(--text-primary);
   border-color: var(--text-muted);
+  background: var(--bg-surface-raised);
 }
 
+/* ─── App Body ───────────────────────────────────────────────────────────── */
 .app-body {
   display: flex;
   height: calc(100vh - 56px);
 }
 
+/* ─── Side Nav ───────────────────────────────────────────────────────────── */
 .side-nav {
-  width: 240px;
+  width: 220px;
   flex-shrink: 0;
   background: var(--bg-surface);
   border-right: 1px solid var(--border-default);
-  padding: 16px 0;
+  padding: 8px 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
+  overflow-y: auto;
 }
 
 .side-nav-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 20px;
+  gap: 10px;
+  padding: 9px 20px;
   color: var(--text-secondary);
   font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 400;
+  font-size: 13px;
+  font-weight: 500;
   text-decoration: none;
   border-radius: 0;
-  transition: background var(--duration-fast), color var(--duration-fast);
+  transition: background var(--duration-fast) var(--easing-default),
+              color var(--duration-fast) var(--easing-default);
   cursor: pointer;
   border: none;
   background: none;
   width: 100%;
   text-align: left;
+  margin: 0 8px;
+  width: calc(100% - 16px);
+  border-radius: 6px;
+}
+
+.side-nav-item svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity var(--duration-fast);
 }
 
 .side-nav-item:hover {
   background: var(--bg-surface-raised);
   color: var(--text-primary);
 }
+
+.side-nav-item:hover svg { opacity: 1; }
 
 .side-nav-item.active {
   color: var(--accent-primary);
@@ -95,8 +129,10 @@
 
 .side-nav-item.active svg {
   color: var(--accent-primary);
+  opacity: 1;
 }
 
+/* ─── Content Area ───────────────────────────────────────────────────────── */
 .content-area {
   flex: 1;
   overflow-y: auto;

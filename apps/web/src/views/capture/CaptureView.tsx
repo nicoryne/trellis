@@ -1,44 +1,36 @@
 import { useState } from 'react';
+import { PenLine, Mic, Upload } from 'lucide-react';
 import TextCapture from './TextCapture';
 import AudioCapture from './AudioCapture';
 import ImageCapture from './ImageCapture';
 
 type Tab = 'write' | 'record' | 'upload';
 
-const TAB_LABELS: Record<Tab, string> = {
-  write: 'Write',
-  record: 'Record',
-  upload: 'Upload',
-};
+const TABS: { key: Tab; label: string; Icon: typeof PenLine }[] = [
+  { key: 'write', label: 'Write', Icon: PenLine },
+  { key: 'record', label: 'Record', Icon: Mic },
+  { key: 'upload', label: 'Upload', Icon: Upload },
+];
 
 export default function CaptureView() {
   const [activeTab, setActiveTab] = useState<Tab>('write');
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-canvas)' }}>
-      <div
-        className="flex border-b shrink-0"
-        style={{ borderColor: 'var(--border-default)', backgroundColor: 'var(--bg-surface)' }}
-      >
-        {(Object.keys(TAB_LABELS) as Tab[]).map(tab => (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-canvas)' }}>
+      <div className="capture-tabs">
+        {TABS.map(({ key, label, Icon }) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className="px-6 py-3 text-sm font-medium transition-colors"
-            style={{
-              color: activeTab === tab ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              borderBottom:
-                activeTab === tab
-                  ? '2px solid var(--accent-primary)'
-                  : '2px solid transparent',
-            }}
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={`capture-tab${activeTab === key ? ' active' : ''}`}
           >
-            {TAB_LABELS[tab]}
+            <Icon size={16} aria-hidden="true" />
+            {label}
           </button>
         ))}
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="capture-content">
         {activeTab === 'write' && <TextCapture />}
         {activeTab === 'record' && <AudioCapture />}
         {activeTab === 'upload' && <ImageCapture />}
