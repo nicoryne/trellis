@@ -122,7 +122,7 @@ export default function AudioCapture() {
             Tap to record a voice note
           </span>
           <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-muted)' }}>
-            Max 5 minutes. Audio is transcribed via Whisper.
+            Max 5 minutes. Audio is transcribed via Gemini.
           </span>
         </div>
       )}

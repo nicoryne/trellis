@@ -113,13 +113,35 @@ Phases 1, 3, 4 use `edge_type = 'related_to'`; Phase 2 uses `about`. Visual diff
 - **Per-message timestamp**: `formatTime(timestamp)` → "HH:MM" beside each message
 - **Avatars**: user shows "You" text label; assistant shows a geometric SVG icon (three interlocking diamonds)
 - **Header subtitle**: "Ask questions grounded in your firm's knowledge graph"
+- **Citation chips** (`views/chat/CitationChip.tsx`, commit `54120e7`): inline mono badge `[1]` / `[1,2,3]`, 11px size, vertical-align super; background `accent-primary-bg` (#2d1a06), text `accent-primary` (#fb8500), border `accent-primary-muted` (#8a4900); hover spring `scale: 1.06, y: -1` (stiffness 420, damping 22); Enter/Space trigger onClick; `role="button"`, `tabIndex={0}`, `aria-label="Citation X, Y, Z"`. Click routes to the first cited node.
+- **Confidence badge** (`views/chat/ConfidenceBadge.tsx`, ~67 lines): per-message pill with dot-fill metaphor showing 4 states:
+
+  | State | Dots | Color | Label |
+  |---|---|---|---|
+  | `high` | 3 filled | `success` `#3fb950` | "High" |
+  | `medium` | 2 filled | `warning` `#d29922` | "Medium" |
+  | `low` | 1 filled | `danger` `#f85149` | "Low" |
+  | `refuse` | 0 filled | `text-muted` `#484f58` | "Insufficient" |
+
+  Optional `sourceCount` prop renders `· N source(s)` in secondary text. 12px font, 500 weight, `border-radius: 999px`.
+
+- **Refusal CTA** (commit `ad3e14c`): when the last assistant message has `confidence === 'refuse'`, a "Capture your thinking on this" button fades in (0.2s delay) and routes the user to `/capture` — converts a dead-end refusal into a usable next step.
+- **Dim cascade isolation**: `.chat-content` wrapper now carries the dim state (`opacity: 0.32; filter: saturate(0.5); pointer-events: none`); QueryOverlay and NodeSummaryPanel are siblings of `.chat-content`, so they escape the dim cascade and render at full opacity above the dimmed chat.
+- **Assistant avatar** (commit `54120e7`): uses the new [[trellis-logo|Logo]] component (`size={20}`) tinted `accent-primary` inside a pill — replaces the prior 3-diamonds SVG icon and reinforces brand in the conversation.
+- **Message width**: `max-width: 880px` per message for readability on wide displays.
+- **Citation parsing**: regex matches UUIDs in brackets — `/\[([a-f0-9-]{36}(?:\s*,\s*[a-f0-9-]{36})*)\]/g`.
 
 ## Query overlay (`views/chat/QueryOverlay.tsx`)
 
 - **Implementation: canvas-based**, not Cytoscape-driven (deviation from spec). The chat-time graph is a separate visual layer rendered to a `<canvas>` with `requestAnimationFrame`.
 - **Timing**: fade-in **400ms**, hold ~**800ms**, fade-out **600ms**
 - **All nodes render at 15% opacity**; cited nodes (by ID) render at **100%** with a glow when opacity > 0.5
-- **Edges between cited nodes** illuminate in `accent-primary` (orange `#fb8500`, revised from amber-gold on 2026-05-14) as their endpoint nodes light up
+- **Edges between cited nodes** illuminate in `accent-primary` (orange `#fb8500`, revised from amber-gold on 2026-05-14) as their endpoint nodes light up — edges only light when **both endpoints are lit** (`min(srcProgress, tgtProgress)`); stroke width scales `1 + 1.4 × edgeProgress`, glow shadow scales with progress
+- **Halo glow** (post-rewrite, commit `ad3e14c`): cited nodes at progress > 0.4 render an outer arc (`size + 6` radius) at 22% opacity, deepening the "this node is the answer" perception
+- **Phase tracking**: explicit `phaseRef.current: 'in' | 'hold' | 'out'`; `in` runs envelope = `min(elapsed / FADE_IN_MS, 1)`, `hold` keeps envelope at 1 until `active === false`, `out` decays envelope to 0 over FADE_OUT_MS
+- **Status label**: "Searching firm knowledge" with three animated dots (1.2s cycle, 0.18s stagger) — fills the perceptual gap between query submit and first `cited-nodes` event
+- **Escape hint**: "ESC to dismiss" fades in top-right after 1.2s
+- **Constants**: `FADE_IN_MS = 400`, `PULSE_STAGGER_MS = 150`, `PULSE_DURATION_MS = 300`, `FADE_OUT_MS = 600`, `ACCENT_RGB = '251, 133, 0'`
 - **`prefers-reduced-motion`**: skips the rAF fade loops; sets opacity directly to 1, holds ~800ms, then collapses instantly
 - **HiDPI**: `devicePixelRatio` canvas scaling
 - **Stability fix**: `Math.random()` was originally inside the render loop causing per-frame node jitter; replaced with deterministic `stableJitter()` (see audit fixes below)

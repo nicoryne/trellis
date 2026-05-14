@@ -173,6 +173,7 @@ export const ChatView: React.FC = () => {
                   citedNodeIds={citedNodeIds}
                   expanded={sourcesExpanded}
                   onToggle={() => setSourcesExpanded(!sourcesExpanded)}
+                  onSourceClick={setSelectedNodeId}
                 />
               )}
           </React.Fragment>
@@ -243,8 +244,9 @@ export const ChatView: React.FC = () => {
 
       {/* Sibling of .chat-content — escapes the dim cascade */}
       <QueryOverlay
-        active={overlayActive}
+        active={isPending || overlayActive}
         citedNodeIds={citedNodeIds}
+        token={token}
         onDismiss={() => setOverlayActive(false)}
       />
 

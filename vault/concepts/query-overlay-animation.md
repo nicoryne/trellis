@@ -58,6 +58,13 @@ This is Hero Moment 3 of three. The other two are the publish-with-redaction mod
 - **HiDPI**: canvas scaled by `devicePixelRatio`
 - **Reduced motion**: rAF loops skipped; opacity set directly to 1, holds ~800ms, then collapses instantly
 - **Determinism fix**: an early implementation had `Math.random()` inside the render loop causing per-frame jitter; replaced with `stableJitter()` (see [[trellis-retrieval-implementation|audit fixes]])
+- **Refinements (commit `ad3e14c`)**:
+  - Explicit phase tracking (`'in' | 'hold' | 'out'`) with envelope math `min(elapsed / FADE_IN_MS, 1)` ramping in, then steady, then decaying
+  - **Status label** "Searching firm knowledge" with three animated dots (1.2s cycle, 0.18s stagger) fills the perceptual gap before the first `cited-nodes` event arrives
+  - **Escape hint** "ESC to dismiss" fades in top-right after 1.2s
+  - **Edge reveal** is gated on both endpoints — `edgeProgress = min(srcProgress, tgtProgress)`; stroke width scales `1 + 1.4 × progress`, glow scales with progress; no edge lights before its nodes
+  - **Halo glow** on cited nodes at progress > 0.4: outer arc at `size + 6` radius, 22% opacity — the "this is the answer" deepening cue
+  - **Dim cascade isolation**: the chat content wrapper carries `opacity: 0.32; filter: saturate(0.5); pointer-events: none`; the overlay sits as a sibling so it escapes the cascade and renders at full opacity above the dimmed chat
 
 > ⚠ Deviation from spec: the spec described a per-node scale pulse (1.0 → 1.15 → 1.0) with edges illuminating via `stroke` transitions; the canvas implementation achieves the same perceptual effect via opacity + glow without per-node scale animation.
 

@@ -6,19 +6,17 @@ import fcose from 'cytoscape-fcose';
 import { useNoteStore } from '../../store/noteStore';
 import {
   notesToCytoscapeElements,
-  NODE_COLORS,
   EDGE_COLOR_HOVER,
 } from '../../lib/graphUtils';
 import { Logo } from '../../components/Logo';
 import { GraphZoomControl } from '../../components/GraphZoomControl';
 
-// Register fcose (idempotent — guarded so it doesn't re-register in HMR)
 if (!(cytoscape as any).__fcoseRegistered) {
   cytoscape.use(fcose);
   (cytoscape as any).__fcoseRegistered = true;
 }
 
-const LABEL_ZOOM_THRESHOLD = 0.75; // Show all labels at >=75% of base zoom
+const LABEL_ZOOM_THRESHOLD = 0.75;
 
 export default function PersonalGraphView() {
   const { notes, loadNotes, setActiveNote } = useNoteStore();
@@ -27,17 +25,22 @@ export default function PersonalGraphView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
   const baseZoomRef = useRef<number>(1);
+  const simRafRef = useRef<number>(0);
+  const velRef = useRef<Map<string, [number, number]>>(new Map());
+  const pinnedRef = useRef<Set<string>>(new Set());
+  const searchRef = useRef('');
   const navigate = useNavigate();
 
   useEffect(() => {
     loadNotes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable Zustand action, run once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep searchRef in sync so event handlers can read current filter
+  useEffect(() => { searchRef.current = search; }, [search]);
 
   const elements = useMemo(() => notesToCytoscapeElements(notes), [notes]);
 
-  // Re-evaluate which labels should be visible given current zoom.
-  // Hovered & selected nodes always show their label.
   const refreshLabelVisibility = useCallback(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -49,14 +52,12 @@ export default function PersonalGraphView() {
     });
   }, []);
 
-  // Slider → cy zoom. Keeps the viewport centered on the current center.
   const applyZoomPercent = useCallback((pct: number) => {
     const cy = cyRef.current;
     if (!cy) return;
     const base = baseZoomRef.current || 1;
-    const target = base * (pct / 100);
     cy.zoom({
-      level: target,
+      level: base * (pct / 100),
       renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 },
     });
   }, []);
@@ -75,7 +76,6 @@ export default function PersonalGraphView() {
     refreshLabelVisibility();
   }, [refreshLabelVisibility]);
 
-  // Build Cytoscape instance with fcose gravity layout
   useEffect(() => {
     if (!containerRef.current || elements.length === 0) return;
 
@@ -115,7 +115,6 @@ export default function PersonalGraphView() {
             'transition-duration': 180,
           } as any,
         },
-        // Phase 2: Classification hub nodes — larger, diamond, muted
         {
           selector: 'node[?isHub]',
           style: {
@@ -127,25 +126,12 @@ export default function PersonalGraphView() {
             'shadow-blur': 8,
             'font-size': 10,
             'font-weight': 500,
-            'text-transform': 'uppercase',
             color: '#484f58',
-          } as any,
-        },
-        {
-          selector: 'node:active, node:grabbed',
-          style: {
-            width: 18,
-            height: 18,
-            'shadow-blur': 20,
-            'shadow-opacity': 0.85,
-            'background-opacity': 1,
           } as any,
         },
         {
           selector: 'node:selected',
           style: {
-            width: 20,
-            height: 20,
             'border-width': 2,
             'border-color': '#fb8500',
             'shadow-blur': 24,
@@ -200,7 +186,6 @@ export default function PersonalGraphView() {
 
     cyRef.current = cy;
 
-    // fcose: settles all nodes (connected or not) into one gravity well with proper spacing.
     const layout = cy.layout({
       name: 'fcose',
       quality: 'default',
@@ -211,12 +196,10 @@ export default function PersonalGraphView() {
       fit: true,
       padding: 60,
       nodeDimensionsIncludeLabels: false,
-      // Gravity — pulls all nodes (incl. disconnected) toward the center
       gravity: 0.35,
       gravityRange: 3.8,
       gravityCompound: 1.0,
       gravityRangeCompound: 1.5,
-      // Spring + repulsion — tuned for tight-but-readable clusters
       idealEdgeLength: 75,
       nodeRepulsion: 4500,
       edgeElasticity: 0.45,
@@ -229,52 +212,170 @@ export default function PersonalGraphView() {
     } as any);
     layout.run();
 
-    // After layout completes: capture base zoom and configure min/max + label visibility
     const onLayoutStop = () => {
       cy.fit(undefined, 60);
       const base = cy.zoom();
       baseZoomRef.current = base;
-      // Hard clamp cy zoom to the slider range so wheel-zoom can't escape it.
       cy.minZoom(base * 0.2);
       cy.maxZoom(base * 1.5);
       setZoomPercent(100);
       refreshLabelVisibility();
+
+      // Degree-scaled radius: leaf nodes 6px, most-connected 18px
+      const maxDeg = cy.nodes().reduce((m, n) => Math.max(m, n.degree()), 0) || 1;
+      cy.nodes().forEach(n => {
+        if (n.data('isHub')) return;
+        const r = 6 + (n.degree() / maxDeg) * 12;
+        n.style({ width: r * 2, height: r * 2 });
+      });
+
+      // Init velocities
+      cy.nodes().forEach(n => { velRef.current.set(n.id(), [0, 0]); });
+
+      const vel = velRef.current;
+      const pinned = pinnedRef.current;
+
+      // Continuous breathing simulation — four forces per node per frame
+      const tick = (time: number) => {
+        const cxP = cy.width() / 2;
+        const cyP = cy.height() / 2;
+
+        const allPos = new Map<string, { x: number; y: number }>();
+        cy.nodes().forEach(n => { allPos.set(n.id(), { ...n.position() }); });
+
+        cy.batch(() => {
+          cy.nodes().forEach(n => {
+            const id = n.id();
+            if (pinned.has(id)) return;
+
+            const pos = allPos.get(id)!;
+            let fx = 0, fy = 0;
+
+            // 1. Center pull
+            fx += (cxP - pos.x) * 0.0004;
+            fy += (cyP - pos.y) * 0.0004;
+
+            // 2. Breathing — unique sinusoidal phase per node
+            const seed = id.split('').reduce((a, c, i) => a + c.charCodeAt(0) * (i + 1), 0) * 0.037;
+            fx += Math.sin(time * 0.00065 + seed) * 0.022;
+            fy += Math.cos(time * 0.00083 + seed * 1.37) * 0.022;
+
+            // 3. Mutual repulsion
+            cy.nodes().forEach(m => {
+              const mid = m.id();
+              if (mid === id) return;
+              const mp = allPos.get(mid);
+              if (!mp) return;
+              const dx = pos.x - mp.x, dy = pos.y - mp.y;
+              const d2 = Math.max(dx * dx + dy * dy, 4);
+              const d = Math.sqrt(d2);
+              fx += (dx / d) * (450 / d2);
+              fy += (dy / d) * (450 / d2);
+            });
+
+            // 4. Edge springs — preferred rest length 75px
+            n.connectedEdges().forEach(e => {
+              const other = e.source().id() === id ? e.target() : e.source();
+              const op = allPos.get(other.id());
+              if (!op) return;
+              const dx = op.x - pos.x, dy = op.y - pos.y;
+              const d = Math.sqrt(dx * dx + dy * dy) || 1;
+              const stretch = (d - 75) * 0.015;
+              fx += (dx / d) * stretch;
+              fy += (dy / d) * stretch;
+            });
+
+            const v = vel.get(id) ?? [0, 0];
+            let vx = v[0] * 0.88 + fx;
+            let vy = v[1] * 0.88 + fy;
+            const spd = Math.sqrt(vx * vx + vy * vy);
+            if (spd > 0.65) { vx = (vx / spd) * 0.65; vy = (vy / spd) * 0.65; }
+            vel.set(id, [vx, vy]);
+            n.position({ x: pos.x + vx, y: pos.y + vy });
+          });
+        });
+
+        simRafRef.current = requestAnimationFrame(tick);
+      };
+
+      simRafRef.current = requestAnimationFrame(tick);
     };
     cy.one('layoutstop', onLayoutStop);
 
-    // Hover: show full styling + always show this node's label
+    // Elastic drag — pin node during grab, release with momentum
+    let dragLastPos: { x: number; y: number } | null = null;
+    let dragLastTime = 0;
+    let dragVX = 0, dragVY = 0;
+
+    cy.on('grabon', 'node', (e) => {
+      pinnedRef.current.add(e.target.id());
+      dragLastPos = { ...e.target.position() };
+      dragLastTime = performance.now();
+      dragVX = 0; dragVY = 0;
+    });
+
+    cy.on('drag', 'node', (e) => {
+      const now = performance.now();
+      const pos = e.target.position();
+      if (dragLastPos) {
+        const dt = Math.max(now - dragLastTime, 1);
+        dragVX = (pos.x - dragLastPos.x) / dt * 16;
+        dragVY = (pos.y - dragLastPos.y) / dt * 16;
+      }
+      dragLastPos = { ...pos };
+      dragLastTime = now;
+    });
+
+    cy.on('free', 'node', (e) => {
+      const id = e.target.id();
+      velRef.current.set(id, [dragVX * 0.35, dragVY * 0.35]);
+      pinnedRef.current.delete(id);
+      dragLastPos = null; dragVX = 0; dragVY = 0;
+    });
+
+    // Hover: spotlight neighborhood, dim everything else to ~15%
     cy.on('mouseover', 'node', (evt) => {
       const node = evt.target;
       node.addClass('cy-hover');
+      const nbNodes = node.neighborhood().nodes();
+      const nbEdges = node.neighborhood().edges();
+
+      cy.nodes().not(node).not(nbNodes).style({ opacity: 0.15 });
+      cy.edges().not(nbEdges).style({ opacity: 0.06 });
+
       node.style({
-        width: 18,
-        height: 18,
-        'shadow-blur': 22,
-        'shadow-opacity': 0.85,
+        'shadow-blur': 26,
+        'shadow-opacity': 0.95,
         'background-opacity': 1,
         color: '#e6edf3',
         'text-opacity': 1,
       });
-      node.connectedEdges().style({ opacity: 0.6, 'line-color': '#30363d', width: 1 });
+      nbNodes.style({ opacity: 0.85 });
+      nbEdges.style({ opacity: 0.8, 'line-color': '#fb8500', width: 1.5 });
     });
 
     cy.on('mouseout', 'node', (evt) => {
       const node = evt.target;
       node.removeClass('cy-hover');
-      if (!node.selected()) {
-        const base = baseZoomRef.current || 1;
-        const showLabel = cy.zoom() / base >= LABEL_ZOOM_THRESHOLD;
-        node.style({
-          width: 14,
-          height: 14,
-          'shadow-blur': 12,
-          'shadow-opacity': 0.6,
-          'background-opacity': 0.9,
-          color: '#8b949e',
-          'text-opacity': showLabel ? 1 : 0,
+
+      // Remove hover bypasses, letting stylesheet rules take back over
+      cy.nodes().removeStyle('opacity');
+      cy.edges().removeStyle('opacity line-color width');
+
+      // Re-apply active search filter
+      const q = searchRef.current.trim().toLowerCase();
+      if (q) {
+        cy.nodes().forEach(n => {
+          n.style({ opacity: (n.data('label') as string).toLowerCase().includes(q) ? 1 : 0.2 });
         });
-        node.connectedEdges().style({ opacity: 0.35, 'line-color': '#21262d', width: 0.75 });
+        cy.edges().style({ opacity: 0.15 });
       }
+
+      if (!node.selected()) {
+        node.removeStyle('shadow-blur shadow-opacity background-opacity color');
+      }
+
+      refreshLabelVisibility();
     });
 
     cy.on('tap', 'node', (evt) => {
@@ -284,7 +385,6 @@ export default function PersonalGraphView() {
         setActiveNote(noteId);
         navigate('/capture');
       } else {
-        // Entity node: highlight 1-hop neighborhood
         const neighborhood = node.neighborhood().add(node);
         cy.elements().not(neighborhood).style({ opacity: 0.2 });
         neighborhood.style({ opacity: 1 });
@@ -297,19 +397,17 @@ export default function PersonalGraphView() {
       }
     });
 
-    // Sync cy zoom → slider state
-    const onZoom = () => {
+    cy.on('zoom', () => {
       const base = baseZoomRef.current || 1;
       const pct = Math.round((cy.zoom() / base) * 100);
       const clamped = Math.max(20, Math.min(150, pct));
-      // Functional update with a small dead-zone to break the slider→cy→slider loop
       setZoomPercent((prev) => (Math.abs(clamped - prev) >= 1 ? clamped : prev));
       refreshLabelVisibility();
-    };
-    cy.on('zoom', onZoom);
+    });
 
     return () => {
       layout.stop();
+      cancelAnimationFrame(simRafRef.current);
       cy.destroy();
       cyRef.current = null;
     };

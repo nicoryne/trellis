@@ -68,7 +68,7 @@ See [[auto-organization-pipeline]] for the full spec. Implementation specifics:
 
 Three routes, all require valid JWT, validated with Zod:
 - `POST /api/organize` → `organizeNote(content)` → `{ entities, classification, isPrivileged }`
-- `POST /api/transcribe` → `multer` audio upload (field: `audio`, uses `originalname`) → Whisper API proxy → transcript text
+- `POST /api/transcribe` → `multer` audio upload (field: `audio`, uses `originalname`) → `gemini-2.5-flash` inline audio transcription → `{ data: { transcript: string } }`. **Note**: spec called for OpenAI Whisper (`whisper-1`); migrated to Gemini Flash (2026-05-14) to consolidate on a single API key. The `openai` npm package has been removed. (see [[whisper]])
 - `POST /api/vision` → `multer` image upload → Gemini Vision proxy → extracted text
 
 ## Capture UI
@@ -85,7 +85,9 @@ Three routes, all require valid JWT, validated with Zod:
 - **Edge IDs**: `edge-{noteId}-entity-{type}:{name}`
 - **Deduplication**: shared entities across notes → single entity node with multiple edges in
 - **Layout (post-polish)**: switched from `cose` to **`cola`** continuous force-directed physics (`infinite: true`, `nodeSpacing: 25`, `edgeLength: 120`) for Obsidian-style organic positioning. Direct `cytoscape` instance built in `useEffect` instead of the `react-cytoscapejs` wrapper.
-- **Interactivity**: search filter (non-matching nodes fade to 20% opacity), node click handlers per type, empty state CTA, hover-to-highlight neighbors (node expands 14→18px; connected edges brighten 0.35→0.6 opacity), tap-to-open detail. (see [[cytoscape-js]])
+- **Interactivity**: search filter (non-matching nodes fade to 20% opacity), node click handlers per type, empty state CTA (uses the new [[trellis-logo|Logo]] component at size 64), hover-to-highlight neighbors (node expands 14→18px; connected edges brighten 0.35→0.6 opacity), tap-to-open detail. (see [[cytoscape-js]])
+- **Zoom control** (post-polish, commit `ad3e14c`): persistent [[graph-zoom-control|GraphZoomControl]] widget anchored bottom-right; range 20–150%, step 5; fit-to-view reset. `baseZoomRef` captures the fit-all zoom after layout settles so the slider's percent reads against that baseline.
+- **Adaptive labels**: entity-node labels suppress below 75% of base zoom (`LABEL_ZOOM_THRESHOLD = 0.75`) but always show on hover/selection.
 - **Classification hubs**: synthetic `classification`-type nodes (`isHub: true`) appear as diamond-shaped, muted-color scaffolding — one per classification value across all notes. See [[derived-edges]] (Phase 2).
 
 ## Personal seed data (`apps/web/src/lib/seedPersonal.ts`)

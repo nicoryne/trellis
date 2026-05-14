@@ -38,6 +38,7 @@ Previous amber-gold palette retired (`#d4a72c` and its variants). Current values
 | `accent-primary-hover` | `#ff9d2a` |
 | `accent-primary-muted` | `#8a4900` |
 | `accent-primary-bg` | `#2d1a06` |
+| `--accent-primary-rgb` | `251, 133, 0` (added 2026-05-14 to support `rgba(var(--accent-primary-rgb), α)` drop-shadow filters on the [[trellis-logo|logo]] and citation chip motion glows) |
 
 ### Semantic
 
@@ -50,7 +51,7 @@ Previous amber-gold palette retired (`#d4a72c` and its variants). Current values
 
 ### Graph nodes
 
-See [[node-color-coding]]. Strict rule: **no overlap with accent or semantic**.
+See [[node-color-coding]]. Strict rule: **no overlap with accent or semantic**. 2026-05-14 palette adjustments alongside the accent rebrand: `witness` `#ff9f1c` → **`#ffd60a`** (saffron); `statute` `#fb5607` → **`#d62828`** (crimson). Both moved away from the new orange accent.
 
 ## Typography
 

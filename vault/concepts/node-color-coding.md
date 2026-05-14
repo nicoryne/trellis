@@ -42,6 +42,15 @@ Palette is implemented in `apps/web/src/lib/graphUtils.ts` as `NODE_COLORS` (a `
 
 Note: `judge` uses `#073b4c` (deep slate) and is rendered **with a white outline** in the graph to maintain legibility against dark backgrounds.
 
+**2026-05-14 palette revisions** (alongside the accent-color rebrand):
+
+| Node type | Before | After | Reason |
+|---|---|---|---|
+| `witness` | `#ff9f1c` (orange) | `#ffd60a` (saffron) | Avoid overlap with the new orange accent `#fb8500` |
+| `statute` | `#fb5607` (vermillion) | `#d62828` (crimson) | Same — vermillion was too close to the new accent |
+
+The strict no-overlap rule did the work here: the two node colors closest to the new accent migrated to maintain the data-vs-UI-signal separation.
+
 ## Sources
 
 - [[trellis-design-guidelines]]

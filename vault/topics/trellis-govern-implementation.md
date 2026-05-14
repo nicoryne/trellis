@@ -85,10 +85,10 @@ See [[redaction-pipeline]] for the canonical concept page. Implementation specif
   - **Personal**: `/capture` (Capture), `/graph` (Personal Graph)
   - **Team**: `/team` (Team Graph), `/chat` (Chat)
   - Icons from Lucide React; icon size reduced to 18px for visual hierarchy
-- **TopNav**: now displays a role badge next to the display name using `ROLE_LABELS` map (`lawyer` → "Lawyer", `practice_group_lead` → "Lead", `knowledge_admin` → "Admin")
+- **TopNav**: now displays a role badge next to the display name using `ROLE_LABELS` map (`lawyer` → "Lawyer", `practice_group_lead` → "Lead", `knowledge_admin` → "Admin"). Also shows the [[trellis-logo|Logo]] component (size 22) before the "Trellis" wordmark; an accent-tinted hairline gradient (`.top-nav::after`) underlines the bar.
 - **Protected route**: `ProtectedRoute` wrapper checks `useAuthStore().token`; redirects to `/login` if missing
 - **Active state**: background `var(--accent-primary-bg)`, foreground and SVG icon `var(--accent-primary)`
-- **Login page polish** (`login.css`, post-polish): "Legal Knowledge Management" subtitle below wordmark, error icon (SVG circle-with-X) beside error text, footer tagline "Powered by Trellis — Knowledge lives here.", card fade-in 400ms (`@keyframes loginFadeIn`), radial gradient glow behind card, focus rings and error-state box-shadows on inputs
+- **Login page polish** (`login.css`, post-polish): "Legal Knowledge Management" subtitle below wordmark, error icon (SVG circle-with-X) beside error text, footer tagline "Powered by Trellis — Knowledge lives here.", card fade-in 400ms (`@keyframes loginFadeIn`), radial gradient glow behind card, focus rings and error-state box-shadows on inputs. Commit `54120e7` added the [[trellis-logo|Logo]] (size 56) at the head of a staggered choreography (logo → wordmark → subtitle → title, `0.06s × index` delay, easing `[0, 0, 0.2, 1]`), with a drop-shadow glow `filter: drop-shadow(0 4px 16px rgba(var(--accent-primary-rgb), 0.25))`.
 
 ## Toast
 

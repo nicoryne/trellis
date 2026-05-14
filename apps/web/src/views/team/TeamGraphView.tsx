@@ -1,5 +1,5 @@
 // apps/web/src/views/team/TeamGraphView.tsx
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import cytoscape, { Core } from 'cytoscape';
 import fcose from 'cytoscape-fcose';
 import { useAuthStore } from '../../store/authStore';
@@ -9,7 +9,6 @@ import { NodeSummaryPanel } from './NodeSummaryPanel';
 import { GraphZoomControl } from '../../components/GraphZoomControl';
 import './team.css';
 
-// Register fcose once
 if (!(cytoscape as any).__fcoseRegistered) {
   cytoscape.use(fcose);
   (cytoscape as any).__fcoseRegistered = true;
@@ -34,6 +33,10 @@ export function TeamGraphView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const baseZoomRef = useRef<number>(1);
+  const simRafRef = useRef<number>(0);
+  const velRef = useRef<Map<string, [number, number]>>(new Map());
+  const pinnedRef = useRef<Set<string>>(new Set());
+  const searchRef = useRef('');
 
   const [graph, setGraph] = useState<TeamGraph | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,7 +45,6 @@ export function TeamGraphView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [zoomPercent, setZoomPercent] = useState(100);
 
-  // Fetch graph data
   useEffect(() => {
     if (!token) return;
     fetchTeamGraph(token).then((result) => {
@@ -51,6 +53,9 @@ export function TeamGraphView() {
       if (result.data) setGraph(result.data);
     });
   }, [token]);
+
+  // Keep searchRef in sync so event handlers can read current filter
+  useEffect(() => { searchRef.current = searchQuery; }, [searchQuery]);
 
   const refreshLabelVisibility = useCallback(() => {
     const cy = cyRef.current;
@@ -67,9 +72,8 @@ export function TeamGraphView() {
     const cy = cyRef.current;
     if (!cy) return;
     const base = baseZoomRef.current || 1;
-    const target = base * (pct / 100);
     cy.zoom({
-      level: target,
+      level: base * (pct / 100),
       renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 },
     });
   }, []);
@@ -88,7 +92,6 @@ export function TeamGraphView() {
     refreshLabelVisibility();
   }, [refreshLabelVisibility]);
 
-  // Build Cytoscape instance
   useEffect(() => {
     if (!containerRef.current || !graph) return;
 
@@ -143,20 +146,8 @@ export function TeamGraphView() {
           } as any,
         },
         {
-          selector: 'node:active, node:grabbed',
-          style: {
-            width: 18,
-            height: 18,
-            'shadow-blur': 20,
-            'shadow-opacity': 0.85,
-            'background-opacity': 1,
-          } as any,
-        },
-        {
           selector: 'node:selected',
           style: {
-            width: 20,
-            height: 20,
             'border-color': '#fb8500',
             'border-width': 2,
             'shadow-blur': 24,
@@ -202,7 +193,6 @@ export function TeamGraphView() {
 
     cyRef.current = cy;
 
-    // fcose with gravity — all nodes pull toward a common center
     const layout = cy.layout({
       name: 'fcose',
       quality: 'default',
@@ -237,42 +227,160 @@ export function TeamGraphView() {
       cy.maxZoom(base * 1.5);
       setZoomPercent(100);
       refreshLabelVisibility();
+
+      // Degree-scaled radius: leaf nodes 6px, most-connected 18px
+      const maxDeg = cy.nodes().reduce((m, n) => Math.max(m, n.degree()), 0) || 1;
+      cy.nodes().forEach(n => {
+        const r = 6 + (n.degree() / maxDeg) * 12;
+        n.style({ width: r * 2, height: r * 2 });
+      });
+
+      // Init velocities
+      cy.nodes().forEach(n => { velRef.current.set(n.id(), [0, 0]); });
+
+      const vel = velRef.current;
+      const pinned = pinnedRef.current;
+
+      // Continuous breathing simulation — four forces per node per frame
+      const tick = (time: number) => {
+        const cxP = cy.width() / 2;
+        const cyP = cy.height() / 2;
+
+        const allPos = new Map<string, { x: number; y: number }>();
+        cy.nodes().forEach(n => { allPos.set(n.id(), { ...n.position() }); });
+
+        cy.batch(() => {
+          cy.nodes().forEach(n => {
+            const id = n.id();
+            if (pinned.has(id)) return;
+
+            const pos = allPos.get(id)!;
+            let fx = 0, fy = 0;
+
+            // 1. Center pull
+            fx += (cxP - pos.x) * 0.0004;
+            fy += (cyP - pos.y) * 0.0004;
+
+            // 2. Breathing — unique sinusoidal phase per node
+            const seed = id.split('').reduce((a, c, i) => a + c.charCodeAt(0) * (i + 1), 0) * 0.037;
+            fx += Math.sin(time * 0.00065 + seed) * 0.022;
+            fy += Math.cos(time * 0.00083 + seed * 1.37) * 0.022;
+
+            // 3. Mutual repulsion
+            cy.nodes().forEach(m => {
+              const mid = m.id();
+              if (mid === id) return;
+              const mp = allPos.get(mid);
+              if (!mp) return;
+              const dx = pos.x - mp.x, dy = pos.y - mp.y;
+              const d2 = Math.max(dx * dx + dy * dy, 4);
+              const d = Math.sqrt(d2);
+              fx += (dx / d) * (450 / d2);
+              fy += (dy / d) * (450 / d2);
+            });
+
+            // 4. Edge springs — preferred rest length 75px
+            n.connectedEdges().forEach(e => {
+              const other = e.source().id() === id ? e.target() : e.source();
+              const op = allPos.get(other.id());
+              if (!op) return;
+              const dx = op.x - pos.x, dy = op.y - pos.y;
+              const d = Math.sqrt(dx * dx + dy * dy) || 1;
+              const stretch = (d - 75) * 0.015;
+              fx += (dx / d) * stretch;
+              fy += (dy / d) * stretch;
+            });
+
+            const v = vel.get(id) ?? [0, 0];
+            let vx = v[0] * 0.88 + fx;
+            let vy = v[1] * 0.88 + fy;
+            const spd = Math.sqrt(vx * vx + vy * vy);
+            if (spd > 0.65) { vx = (vx / spd) * 0.65; vy = (vy / spd) * 0.65; }
+            vel.set(id, [vx, vy]);
+            n.position({ x: pos.x + vx, y: pos.y + vy });
+          });
+        });
+
+        simRafRef.current = requestAnimationFrame(tick);
+      };
+
+      simRafRef.current = requestAnimationFrame(tick);
     };
     cy.one('layoutstop', onLayoutStop);
 
-    // Hover: show full styling + always show this node's label
+    // Elastic drag — pin node during grab, release with momentum
+    let dragLastPos: { x: number; y: number } | null = null;
+    let dragLastTime = 0;
+    let dragVX = 0, dragVY = 0;
+
+    cy.on('grabon', 'node', (e) => {
+      pinnedRef.current.add(e.target.id());
+      dragLastPos = { ...e.target.position() };
+      dragLastTime = performance.now();
+      dragVX = 0; dragVY = 0;
+    });
+
+    cy.on('drag', 'node', (e) => {
+      const now = performance.now();
+      const pos = e.target.position();
+      if (dragLastPos) {
+        const dt = Math.max(now - dragLastTime, 1);
+        dragVX = (pos.x - dragLastPos.x) / dt * 16;
+        dragVY = (pos.y - dragLastPos.y) / dt * 16;
+      }
+      dragLastPos = { ...pos };
+      dragLastTime = now;
+    });
+
+    cy.on('free', 'node', (e) => {
+      const id = e.target.id();
+      velRef.current.set(id, [dragVX * 0.35, dragVY * 0.35]);
+      pinnedRef.current.delete(id);
+      dragLastPos = null; dragVX = 0; dragVY = 0;
+    });
+
+    // Hover: spotlight neighborhood, dim everything else to ~15%
     cy.on('mouseover', 'node', (e) => {
       const node = e.target;
       node.addClass('cy-hover');
+      const nbNodes = node.neighborhood().nodes();
+      const nbEdges = node.neighborhood().edges();
+
+      cy.nodes().not(node).not(nbNodes).style({ opacity: 0.15 });
+      cy.edges().not(nbEdges).style({ opacity: 0.06 });
+
       node.style({
-        width: 18,
-        height: 18,
-        'shadow-blur': 22,
-        'shadow-opacity': 0.85,
+        'shadow-blur': 26,
+        'shadow-opacity': 0.95,
         'background-opacity': 1,
         color: '#e6edf3',
         'text-opacity': 1,
       });
-      node.connectedEdges().style({ opacity: 0.6, 'line-color': '#30363d', width: 1 });
+      nbNodes.style({ opacity: 0.85 });
+      nbEdges.style({ opacity: 0.8, 'line-color': '#fb8500', width: 1.5 });
     });
 
     cy.on('mouseout', 'node', (e) => {
       const node = e.target;
       node.removeClass('cy-hover');
-      if (!node.selected()) {
-        const base = baseZoomRef.current || 1;
-        const showLabel = cy.zoom() / base >= LABEL_ZOOM_THRESHOLD;
-        node.style({
-          width: 14,
-          height: 14,
-          'shadow-blur': 12,
-          'shadow-opacity': 0.6,
-          'background-opacity': 0.9,
-          color: '#8b949e',
-          'text-opacity': showLabel ? 1 : 0,
+
+      // Remove hover bypasses, letting stylesheet rules take back over
+      cy.nodes().removeStyle('opacity');
+      cy.edges().removeStyle('opacity line-color width');
+
+      // Re-apply active search filter
+      const q = searchRef.current.trim().toLowerCase();
+      if (q) {
+        cy.nodes().forEach(n => {
+          n.style({ opacity: n.data('label')?.toLowerCase().includes(q) ? 1 : 0.15 });
         });
-        node.connectedEdges().style({ opacity: 0.35, 'line-color': '#21262d', width: 0.75 });
       }
+
+      if (!node.selected()) {
+        node.removeStyle('shadow-blur shadow-opacity background-opacity color');
+      }
+
+      refreshLabelVisibility();
     });
 
     cy.on('tap', 'node', (e) => {
@@ -283,7 +391,6 @@ export function TeamGraphView() {
       if (e.target === cy) setSelectedNodeId(null);
     });
 
-    // Sync cy zoom → slider state
     cy.on('zoom', () => {
       const base = baseZoomRef.current || 1;
       const pct = Math.round((cy.zoom() / base) * 100);
@@ -294,6 +401,7 @@ export function TeamGraphView() {
 
     return () => {
       layout.stop();
+      cancelAnimationFrame(simRafRef.current);
       cy.destroy();
       cyRef.current = null;
     };
