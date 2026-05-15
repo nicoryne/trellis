@@ -25,6 +25,25 @@ Return "knowledge" when the message asks for facts, opinions, or strategy from t
 
 When in doubt, return "knowledge". Misrouting a substantive query to conversational is worse than the other direction.`;
 
+const model = genAI.getGenerativeModel({
+  model: 'gemini-2.5-flash',
+  systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
+  generationConfig: {
+    responseMimeType: 'application/json',
+    responseSchema: {
+      type: SchemaType.OBJECT,
+      properties: {
+        kind: {
+          type: SchemaType.STRING,
+          format: 'enum',
+          enum: ['knowledge', 'conversational'],
+        },
+      },
+      required: ['kind'],
+    },
+  },
+});
+
 function buildHistoryBlock(recentTurns: ChatTurn[]): string {
   if (recentTurns.length === 0) return '(no prior turns)';
   const last = recentTurns[recentTurns.length - 1];
@@ -37,25 +56,6 @@ export async function classifyQuery(
   query: string,
   recentTurns: ChatTurn[]
 ): Promise<ChatKind> {
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: SchemaType.OBJECT,
-        properties: {
-          kind: {
-            type: SchemaType.STRING,
-            format: 'enum',
-            enum: ['knowledge', 'conversational'],
-          },
-        },
-        required: ['kind'],
-      },
-    },
-  });
-
   const userMessage = `${buildHistoryBlock(recentTurns)}\n\nCurrent user message:\n${query}`;
 
   try {
