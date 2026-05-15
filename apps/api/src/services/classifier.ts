@@ -45,7 +45,11 @@ export async function classifyQuery(
       responseSchema: {
         type: SchemaType.OBJECT,
         properties: {
-          kind: { type: SchemaType.STRING },
+          kind: {
+            type: SchemaType.STRING,
+            format: 'enum',
+            enum: ['knowledge', 'conversational'],
+          },
         },
         required: ['kind'],
       },
