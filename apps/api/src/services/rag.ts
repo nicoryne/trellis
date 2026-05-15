@@ -17,6 +17,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { generateEmbedding } from './embedding';
 import { vectorSearch, expandOneHop } from '../db/queries';
+import { withGeminiRetry } from './gemini-retry';
 
 /**
  * Resolve prompt file path. Works under both:
@@ -188,7 +189,12 @@ export async function* streamRagResponse(
     systemInstruction: chatSystemPrompt,
   });
 
-  const result = await model.generateContentStream(userMessage);
+  // Retry the initial stream connect only. Once chunks start flowing we can't
+  // safely retry mid-stream — partial output may already have reached the user.
+  const result = await withGeminiRetry(
+    (opts) => model.generateContentStream(userMessage, opts),
+    { label: 'rag.stream', timeoutMs: 30_000 }
+  );
 
   for await (const chunk of result.stream) {
     const text = chunk.text();

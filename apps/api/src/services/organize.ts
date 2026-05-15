@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { withGeminiRetry } from './gemini-retry';
 
 export interface OrganizeResult {
   entities: Array<{
@@ -58,7 +59,10 @@ const model = genAI.getGenerativeModel({
 });
 
 export async function organizeNote(content: string): Promise<OrganizeResult> {
-  const result = await model.generateContent(content);
+  const result = await withGeminiRetry(
+    (opts) => model.generateContent(content, opts),
+    { label: 'organize', timeoutMs: 30_000 }
+  );
   const text = result.response.text();
   try {
     return JSON.parse(text) as OrganizeResult;

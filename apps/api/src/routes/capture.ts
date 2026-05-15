@@ -4,6 +4,7 @@ import multer from 'multer';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { auth } from '../middleware/auth';
 import { organizeNote } from '../services/organize';
+import { withGeminiRetry } from '../services/gemini-retry';
 
 const router = Router();
 const upload = multer({
@@ -41,10 +42,17 @@ router.post('/transcribe', upload.single('audio'), auth, async (req: Request, re
   }
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    const result = await model.generateContent([
-      'Transcribe this audio exactly as spoken. Return only the transcription text, no commentary or formatting.',
-      { inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype } },
-    ]);
+    const result = await withGeminiRetry(
+      (opts) =>
+        model.generateContent(
+          [
+            'Transcribe this audio exactly as spoken. Return only the transcription text, no commentary or formatting.',
+            { inlineData: { data: req.file!.buffer.toString('base64'), mimeType: req.file!.mimetype } },
+          ],
+          opts
+        ),
+      { label: 'transcribe', timeoutMs: 45_000 }
+    );
     return res.json({ data: { transcript: result.response.text().trim() } });
   } catch {
     return res.status(500).json({
@@ -61,10 +69,17 @@ router.post('/vision', upload.single('image'), auth, async (req: Request, res: R
   }
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
-    const result = await model.generateContent([
-      'Extract all text from this image and provide a brief structural description. Return ONLY JSON: { "text": "extracted text", "description": "brief structure description" }',
-      { inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype } },
-    ]);
+    const result = await withGeminiRetry(
+      (opts) =>
+        model.generateContent(
+          [
+            'Extract all text from this image and provide a brief structural description. Return ONLY JSON: { "text": "extracted text", "description": "brief structure description" }',
+            { inlineData: { data: req.file!.buffer.toString('base64'), mimeType: req.file!.mimetype } },
+          ],
+          opts
+        ),
+      { label: 'vision', timeoutMs: 30_000 }
+    );
     const parsed = JSON.parse(result.response.text());
     return res.json({ data: parsed });
   } catch {
