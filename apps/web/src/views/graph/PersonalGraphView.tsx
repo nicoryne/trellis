@@ -119,20 +119,18 @@ export default function PersonalGraphView() {
 
     const nbNodes = node.neighborhood().nodes();
     const nbEdges = node.neighborhood().edges();
-    cy.nodes().not(node).not(nbNodes).style({ opacity: 0.2 });
+    // Non-spotlight nodes: turn grey (override their per-type color),
+    // dim the colored shadow, hide their labels. Spotlight + neighbors
+    // retain their per-type color from the stylesheet default.
+    cy.nodes().not(node).not(nbNodes).style({
+      'background-color': '#3a3f47',
+      'shadow-color': '#3a3f47',
+      'background-opacity': 0.5,
+      'text-opacity': 0,
+    });
     cy.edges().not(nbEdges).style({ opacity: 0.06 });
 
-    // Restore per-type color on the spotlighted node + neighbors so their
-    // identity reads through. Everything else stays grey + dimmed.
-    const colorize = (el: cytoscape.NodeSingular) => {
-      const c = el.data('color') as string | undefined;
-      if (c) el.style({ 'background-color': c, 'shadow-color': c });
-    };
-    nbNodes.forEach(colorize);
-    colorize(node as any);
-
-    // Boost shadow on the spotlighted node — strongest visual cue for the
-    // hover target. Neighbors light up via color + brighter opacity.
+    // Spotlight node: shadow glow + label visible.
     node.style({
       'shadow-blur': 20,
       'shadow-opacity': 0.95,
@@ -140,7 +138,8 @@ export default function PersonalGraphView() {
       color: '#e6edf3',
       'text-opacity': 1,
     });
-    nbNodes.style({ opacity: 0.85, 'background-opacity': 0.95 });
+    // Neighbors keep their color from the stylesheet; bump opacity + labels.
+    nbNodes.style({ 'background-opacity': 1, 'text-opacity': 1 });
     nbEdges.style({ opacity: 0.7, 'line-color': '#fb8500', width: 1.5 });
   }, []);
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, PenLine } from 'lucide-react';
+import { Send, PenLine, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useChatStore } from '../../store/chatStore';
@@ -45,7 +45,18 @@ export const ChatView: React.FC = () => {
     appendToken,
     finishStreaming,
     setOverlayActive,
+    clearMessages,
   } = useChatStore();
+
+  const handleResetChat = useCallback(() => {
+    if (messages.length === 0) return;
+    if (!window.confirm('Reset the chat? This clears all messages in this conversation.')) return;
+    clearMessages();
+    setSelectedNodeId(null);
+    setSourcesExpanded(false);
+    setInput('');
+    inputRef.current?.focus();
+  }, [messages.length, clearMessages]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -122,8 +133,9 @@ export const ChatView: React.FC = () => {
     !isStreaming &&
     lastMsg.kind === 'knowledge' &&
     lastMsg.confidence === 'refuse';
-  // Dim chat from submission through overlay reveal
-  const dimChat = overlayActive || isPending;
+  // Only dim when the knowledge-graph overlay is open. Conversational replies
+  // skip the overlay entirely, so they should keep the chat fully readable.
+  const dimChat = overlayActive;
 
   // Resolution set for citation chips: every node ID ever cited in this
   // conversation. Lets conversational follow-ups re-quote prior-turn citations.
@@ -145,9 +157,26 @@ export const ChatView: React.FC = () => {
       <div className={`chat-content${dimChat ? ' chat-content--dimmed' : ''}`}>
       {/* Header */}
       <div className="chat-header">
-        <h1>Team Brain</h1>
-        <div className="chat-header-sub">
-          Ask questions grounded in your firm's knowledge graph
+        <div className="chat-header-main">
+          <div>
+            <h1>Team Brain</h1>
+            <div className="chat-header-sub">
+              Ask questions grounded in your firm's knowledge graph
+            </div>
+          </div>
+          {messages.length > 0 && (
+            <button
+              type="button"
+              className="chat-reset-btn"
+              onClick={handleResetChat}
+              disabled={isStreaming || isPending}
+              title="Reset chat — clears all messages"
+              aria-label="Reset chat"
+            >
+              <Trash2 size={14} />
+              Reset chat
+            </button>
+          )}
         </div>
       </div>
 
@@ -181,30 +210,42 @@ export const ChatView: React.FC = () => {
           </div>
         )}
 
-        {messages.map((msg) => (
-          <React.Fragment key={msg.id}>
-            <ChatMessageComponent
-              message={msg}
-              isStreaming={isStreaming && msg === messages[messages.length - 1]}
-              onCitationClick={setSelectedNodeId}
-              citedNodeIds={allCitedNodeIds}
-            />
-            {/* Sources panel — only after the latest assistant message, never on refusals */}
-            {msg.role === 'assistant' &&
-              !isStreaming &&
-              msg === messages[messages.length - 1] &&
-              msg.kind === 'knowledge' &&
-              msg.confidence !== 'refuse' &&
-              citedNodeIds.length > 0 && (
-                <SourcesPanel
-                  citedNodeIds={citedNodeIds}
-                  expanded={sourcesExpanded}
-                  onToggle={() => setSourcesExpanded(!sourcesExpanded)}
-                  onSourceClick={setSelectedNodeId}
-                />
-              )}
-          </React.Fragment>
-        ))}
+        {messages.map((msg) => {
+          // Don't render the empty placeholder bubble for the streaming
+          // assistant message — the thinking-dots indicator below covers that
+          // state, otherwise we get two stacked bubbles.
+          const isEmptyStreamingAssistant =
+            msg.role === 'assistant' &&
+            msg.content === '' &&
+            isStreaming &&
+            msg === messages[messages.length - 1];
+          if (isEmptyStreamingAssistant) return null;
+
+          return (
+            <React.Fragment key={msg.id}>
+              <ChatMessageComponent
+                message={msg}
+                isStreaming={isStreaming && msg === messages[messages.length - 1]}
+                onCitationClick={setSelectedNodeId}
+                citedNodeIds={allCitedNodeIds}
+              />
+              {/* Sources panel — only after the latest assistant message, never on refusals */}
+              {msg.role === 'assistant' &&
+                !isStreaming &&
+                msg === messages[messages.length - 1] &&
+                msg.kind === 'knowledge' &&
+                msg.confidence !== 'refuse' &&
+                citedNodeIds.length > 0 && (
+                  <SourcesPanel
+                    citedNodeIds={citedNodeIds}
+                    expanded={sourcesExpanded}
+                    onToggle={() => setSourcesExpanded(!sourcesExpanded)}
+                    onSourceClick={setSelectedNodeId}
+                  />
+                )}
+            </React.Fragment>
+          );
+        })}
 
         {/* Refusal CTA — subtle suggestion to capture related personal note (§8.2) */}
         {isLastAssistantRefusal && (

@@ -5,7 +5,7 @@ status: active
 tags: [ai-model, llm, vendor, google]
 sources: [trellis-project-architecture, trellis-product-requirements, trellis-context-dump, trellis-seed-data-analysis, trellis-implementation-plan]
 created: 2026-05-12
-updated: 2026-05-14
+updated: 2026-05-15
 ---
 
 # Gemini
@@ -25,8 +25,15 @@ Google's frontier LLM family. Trellis MVP uses three variants plus an embedding 
 
 - **[[auto-organization-pipeline]]**: single structured-output Gemini Pro call returns `{ entities, classification, isPrivileged }`.
 - **[[redaction-pipeline]]**: Pass 2 generalization rewrites specifics to legal-principle level. Pass 4 (preservation) at V1 is a dedicated Gemini call.
-- **[[rag-query-pipeline]]**: streams the response with system-prompt-enforced grounding and inline `[node_id]` citations; refuses if no nodes above 0.75 similarity.
+- **[[rag-query-pipeline]]**: streams the response with system-prompt-enforced grounding and inline `[node_id]` citations; refuses below the recalibrated thresholds (no nodes ≥0.60).
+- **[[chat-query-classifier]]** (added 2026-05-15): Gemini Flash routes every chat message to either the knowledge pipeline or the [[conversational-chat-path]]. Structured output with `format: 'enum'`, tight 8 s timeout, fails safe to `knowledge`.
+- **[[conversational-chat-path]]** (added 2026-05-15): Gemini Flash streaming reply with no retrieval, used for greetings / capability questions / prior-turn follow-ups.
 - **Audio transcription** (added 2026-05-14): Gemini 2.5 Flash via `inlineData` (base64 WebM/Opus) on `POST /api/transcribe`. Replaced [[whisper|OpenAI Whisper]] to consolidate on a single API key.
+- **Vision OCR** (revised 2026-05-15): `POST /api/vision` now uses `responseMimeType: 'application/json'` + `responseSchema` for `{ text, description }` — matches the structured-output discipline already used by organize and the classifier (replaces the older prompt-only "return ONLY JSON" pattern).
+
+## Reliability — retry wrapper (added 2026-05-15)
+
+Every Gemini SDK call in the API service now routes through **`withGeminiRetry`** ([[gemini-retry-backoff]]). Exponential backoff with full jitter, per-attempt SDK `timeout`, retryable-error classification (`GoogleGenerativeAIFetchError` 408/425/429/5xx, abort errors, network-layer failures, status codes in message strings). This lifts the prior "no retry, no timeout, transient 5xx surfaces as 500" fragility. Streaming calls retry the initial connect only — mid-stream chunks aren't safely resumable.
 
 ## Cost envelope (MVP demo period)
 

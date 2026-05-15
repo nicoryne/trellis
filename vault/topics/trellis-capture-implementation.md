@@ -66,6 +66,7 @@ IDB-backed save, load, and organization update. Sits between views and IDB; view
 - `setClassification(noteId, value, provenance)`, `setPrivilege(noteId, value, provenance)` — per-field setters with provenance flip.
 - `dismissEntity(noteId, entityId)` — removes the entity and records its `type:name` key in `dismissedEntityKeys` so subsequent AI passes do not re-add it.
 - `applyAiOrganize(noteId, response)` — delegates to `lib/organizeMerge.ts`, returns `{ suggestions }` for user-set fields where AI disagrees (see [[auto-organization-pipeline]] provenance table).
+- `restoreOrganizeSnapshot(noteId, snapshot)` (added 2026-05-15, working tree): atomically writes back all five organize-relevant fields from an `OrganizeSnapshot` (`extractedEntities`, `classification`, `isPrivileged`, `organizeProvenance`, `dismissedEntityKeys`). Backs the **Revert button** in the Organize panel — TextCapture snapshots state right before each Gemini call and clears the snapshot on note switch / revert / next successful organize.
 - `removeEntity(noteId, entityId)` — older direct-remove API retained.
 
 **Folder actions:** `createFolder`, `deleteFolder` (unfiles all member notes), `moveNoteToFolder`.
@@ -84,10 +85,11 @@ See [[auto-organization-pipeline]] for the full spec. Implementation specifics:
 
 ## Capture routes (`apps/api/src/routes/capture.ts`)
 
-Three routes, all require valid JWT, validated with Zod:
-- `POST /api/organize` → `organizeNote(content)` → `{ entities, classification, isPrivileged }`
+Three routes, all require valid JWT, validated with Zod. All three Gemini callers route through [[gemini-retry-backoff|withGeminiRetry]] (added 2026-05-15) for transient-error resilience:
+
+- `POST /api/organize` → `organizeNote(content)` → `{ entities, classification, isPrivileged }`. Wrapped in retry; see [[auto-organization-pipeline]].
 - `POST /api/transcribe` → `multer` audio upload (field: `audio`, uses `originalname`) → `gemini-2.5-flash` inline audio transcription → `{ data: { transcript: string } }`. **Note**: spec called for OpenAI Whisper (`whisper-1`); migrated to Gemini Flash (2026-05-14) to consolidate on a single API key. The `openai` npm package has been removed. (see [[whisper]])
-- `POST /api/vision` → `multer` image upload → Gemini Vision proxy → extracted text
+- `POST /api/vision` → `multer` image upload → `gemini-2.5-pro` with **structured output** (revised 2026-05-15): `responseMimeType: 'application/json'` + `responseSchema` for `{ text, description }`. Replaces the older prompt-only "return ONLY JSON" pattern, matching the structured-output discipline used by `/api/organize` and the [[chat-query-classifier]].
 
 ## Capture UI
 
@@ -122,6 +124,8 @@ The previous "silent auto-organize on debounced body change" model is gone. The 
 - **Deduplication**: shared entities across notes → single entity node with multiple edges in
 - **Layout (post-polish)**: switched from `cose` to **`cola`** continuous force-directed physics (`infinite: true`, `nodeSpacing: 25`, `edgeLength: 120`) for Obsidian-style organic positioning. Direct `cytoscape` instance built in `useEffect` instead of the `react-cytoscapejs` wrapper.
 - **Interactivity**: search filter (non-matching nodes fade to 20% opacity), node click handlers per type, empty state CTA (uses the new [[trellis-logo|Logo]] component at size 64), hover-to-highlight neighbors (node expands 14→18px; connected edges brighten 0.35→0.6 opacity), tap-to-open detail. (see [[cytoscape-js]])
+- **Rest state — color, not grey (revised 2026-05-15, working tree)**: previously stylesheet `background-color: #3a3f47` with per-type color restored inline only on the hovered/selected node + neighbors. **Inverted**: stylesheet now reads `background-color: data(color)` (per-type at rest, opacity 0.9, colored shadow blur 6 / opacity 0.5). The **spotlight handler greys-out non-spotlight nodes** inline (`background-color: #3a3f47`, `shadow-color: #3a3f47`, `text-opacity: 0`), leaving the spotlight + neighbors with their stylesheet-default per-type color. The personal graph at rest now reads as a vibrant constellation, not a flat grey grid.
+- **Degree-scaled sizes via node data, not style (revised 2026-05-15)**: `recomputeNodeRadii(cy)` in `lib/graphDiff.ts` now writes `size` as **node data** (`n.data('size', r * 2)`), not inline style. The stylesheet reads it via `el.data('size') ?? 32`. Why: `removeStyle()` calls during hover-spotlight cleanup wiped inline width/height, collapsing every node back to the 32 px default. Hub nodes get a fixed 44 px (previously skipped entirely); insights/entities interpolate 32–80 px by degree.
 - **Zoom control** (post-polish, commit `ad3e14c`): persistent [[graph-zoom-control|GraphZoomControl]] widget anchored bottom-right; range 20–150%, step 5; fit-to-view reset. `baseZoomRef` captures the fit-all zoom after layout settles so the slider's percent reads against that baseline.
 - **Adaptive labels**: entity-node labels suppress below 75% of base zoom (`LABEL_ZOOM_THRESHOLD = 0.75`) but always show on hover/selection.
 - **Classification hubs**: synthetic `classification`-type nodes (`isHub: true`) appear as diamond-shaped, muted-color scaffolding — one per classification value across all notes. See [[derived-edges]] (Phase 2).

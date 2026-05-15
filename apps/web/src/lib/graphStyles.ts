@@ -16,11 +16,10 @@ export const personalGraphStylesheet: any[] = [
   {
     selector: 'node',
     style: {
-      // Rest state is uniform light grey — colors only surface on hover so
-      // the canvas reads as a clean constellation. data(color) is still
-      // available on the node; the spotlight handler restores it inline.
-      'background-color': '#3a3f47',
-      'background-opacity': 0.85,
+      // Rest state shows per-type color. The spotlight handler greys-out
+      // non-spotlight nodes inline when a hover/selection is active.
+      'background-color': 'data(color)',
+      'background-opacity': 0.9,
       label: 'data(label)',
       'font-size': 11,
       'font-family': 'Inter, system-ui, sans-serif',
@@ -35,17 +34,21 @@ export const personalGraphStylesheet: any[] = [
       'text-outline-width': 2,
       'text-outline-opacity': 0.8,
       'text-opacity': 1,
-      width: 32,
-      height: 32,
+      // Read degree-scaled size from data (set by recomputeNodeRadii in
+      // lib/graphDiff). Falls back to 32 when not yet computed. Storing as
+      // data instead of inline style means removeStyle() during hover
+      // cleanup doesn't wipe per-node sizing.
+      width: (el: any) => (el.data('size') as number | undefined) ?? 32,
+      height: (el: any) => (el.data('size') as number | undefined) ?? 32,
       'border-width': 0,
       // Halved shadow-blur (12 → 6) — shadow drawing is per-node per-frame
       // and dominates render cost in the cola simulation. Still gives a
       // faint colored glow; the hover override goes louder for emphasis.
-      'shadow-blur': 4,
-      'shadow-color': '#3a3f47',
+      'shadow-blur': 6,
+      'shadow-color': 'data(color)',
       'shadow-offset-x': 0,
       'shadow-offset-y': 0,
-      'shadow-opacity': 0.4,
+      'shadow-opacity': 0.5,
       'overlay-opacity': 0,
     } as any,
   },

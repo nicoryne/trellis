@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, Plus, Link2, X } from 'lucide-react';
+import { Sparkles, Plus, Link2, X, Undo2 } from 'lucide-react';
 import { GeminiIcon } from '../../components/GeminiIcon';
 import type { Entity, NoteClassification, PersonalNote } from '../../types/index';
 import { useNoteStore } from '../../store/noteStore';
@@ -37,6 +37,8 @@ interface Props {
   organizeError: string | null;
   lastOrganizedAt: number | null;
   suggestions: { classification?: NoteClassification; isPrivileged?: boolean };
+  canRevert: boolean;
+  onRevert: () => void;
   onAcceptClassificationSuggestion: () => void;
   onDismissClassificationSuggestion: () => void;
   onAcceptPrivilegeSuggestion: () => void;
@@ -48,6 +50,7 @@ export function OrganizePanel(props: Props) {
   const {
     note, body, collapsed, onToggleCollapsed,
     onOrganize, isOrganizing, organizeError, lastOrganizedAt, suggestions,
+    canRevert, onRevert,
     onAcceptClassificationSuggestion, onDismissClassificationSuggestion,
     onAcceptPrivilegeSuggestion, onDismissPrivilegeSuggestion,
     onInsertLinkLabel,
@@ -212,20 +215,31 @@ export function OrganizePanel(props: Props) {
       </section>
 
       <div className="organize-panel__footer">
-        <button
-          type="button"
-          className="btn btn--primary organize-action"
-          disabled={disabled}
-          onClick={onOrganize}
-        >
-          <GeminiIcon size={16} />
-          {isOrganizing ? 'Organizing…' : 'Organize with Gemini'}
-        </button>
+        {canRevert && !isOrganizing ? (
+          <button
+            type="button"
+            className="btn btn--primary organize-action organize-action--revert"
+            onClick={onRevert}
+          >
+            <Undo2 size={16} />
+            Revert
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn btn--primary organize-action"
+            disabled={disabled}
+            onClick={onOrganize}
+          >
+            <GeminiIcon size={16} />
+            {isOrganizing ? 'Organizing…' : 'Organize with Gemini'}
+          </button>
+        )}
         {organizeError && <div className="organize-error">{organizeError}</div>}
         {!organizeError && lastOrganizedAt && (
           <div className="organize-meta">Last organized: {timeAgo(lastOrganizedAt)}</div>
         )}
-        {!canOrganize && !isOrganizing && (
+        {!canOrganize && !isOrganizing && !canRevert && (
           <div className="organize-meta">Write at least 20 characters to enable.</div>
         )}
       </div>

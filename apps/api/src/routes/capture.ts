@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai';
 import { auth } from '../middleware/auth';
 import { organizeNote } from '../services/organize';
 import { withGeminiRetry } from '../services/gemini-retry';
@@ -16,6 +16,15 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 const organizeSchema = z.object({
   content: z.string().min(1).max(50_000),
 });
+
+const visionResponseSchema: Schema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    text: { type: SchemaType.STRING },
+    description: { type: SchemaType.STRING },
+  },
+  required: ['text', 'description'],
+};
 
 router.post('/organize', auth, async (req: Request, res: Response) => {
   const parsed = organizeSchema.safeParse(req.body);
@@ -68,12 +77,18 @@ router.post('/vision', upload.single('image'), auth, async (req: Request, res: R
     });
   }
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-pro',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: visionResponseSchema,
+      },
+    });
     const result = await withGeminiRetry(
       (opts) =>
         model.generateContent(
           [
-            'Extract all text from this image and provide a brief structural description. Return ONLY JSON: { "text": "extracted text", "description": "brief structure description" }',
+            'Extract all text from this image and provide a brief structural description.',
             { inlineData: { data: req.file!.buffer.toString('base64'), mimeType: req.file!.mimetype } },
           ],
           opts

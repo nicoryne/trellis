@@ -91,6 +91,9 @@ Catalog of every page in the wiki. Updated on every ingest and every lint.
 - [[derived-edges]] — Obsidian-style automatic connections in the team and personal graphs: shared-entity, classification-hub, embedding-similarity, entity-co-occurrence
 - [[graph-zoom-control]] — Persistent zoom widget for the personal and team graph views: range 20–150%, gradient slider, fit-to-view reset, adaptive label threshold
 - [[note-wikilinks]] — Author-stated `[[Title]]` linking in personal notes: UUID-stable resolution, soft delete, backlinks panel, solid-purple `linked_to` edges + organize-provenance model
+- [[chat-query-classifier]] — Gemini Flash router that decides every chat message between knowledge (RAG) and conversational (no retrieval); fails safe to knowledge
+- [[conversational-chat-path]] — No-retrieval Gemini Flash chat reply for greetings, capability questions, prior-turn follow-ups; hard rule against substantive legal claims from training data
+- [[gemini-retry-backoff]] — Shared `withGeminiRetry` wrapper for every Gemini SDK call: exponential backoff + full jitter, per-attempt timeout, retryable-error classification
 
 ## Topics
 

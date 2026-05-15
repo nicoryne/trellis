@@ -10,7 +10,17 @@ import type {
   OrganizeResponse,
   Entity,
   NoteClassification,
+  OrganizeProvenance,
 } from '../types/index';
+
+/** Snapshot of the organize-relevant fields, used to revert AI changes. */
+export interface OrganizeSnapshot {
+  extractedEntities: Entity[];
+  classification: NoteClassification;
+  isPrivileged: boolean;
+  organizeProvenance?: OrganizeProvenance;
+  dismissedEntityKeys?: string[];
+}
 
 interface NoteState {
   notes: PersonalNote[];
@@ -36,6 +46,7 @@ interface NoteState {
     noteId: string,
     response: OrganizeResponse
   ) => Promise<{ suggestions: { classification?: NoteClassification; isPrivileged?: boolean } }>;
+  restoreOrganizeSnapshot: (noteId: string, snapshot: OrganizeSnapshot) => Promise<void>;
   createFolder: (name: string) => Promise<NoteFolder>;
   deleteFolder: (id: string) => Promise<void>;
   moveNoteToFolder: (noteId: string, folderId: string | null) => Promise<void>;
@@ -218,6 +229,19 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     set(state => ({ notes: state.notes.map(n => (n.id === noteId ? updated : n)) }));
     for (const e of result.extractedEntities) await idb.saveEntity(e);
     return { suggestions: result.suggestions };
+  },
+
+  /** Atomically restore the snapshot of pre-Gemini state. Used by the
+      "Revert" button to undo everything an organize call introduced. */
+  restoreOrganizeSnapshot: async (noteId, snapshot) => {
+    const updated = await idb.updateNote(noteId, {
+      extractedEntities: snapshot.extractedEntities,
+      classification: snapshot.classification,
+      isPrivileged: snapshot.isPrivileged,
+      organizeProvenance: snapshot.organizeProvenance,
+      dismissedEntityKeys: snapshot.dismissedEntityKeys,
+    });
+    set(state => ({ notes: state.notes.map(n => (n.id === noteId ? updated : n)) }));
   },
 
   createFolder: async (name) => {

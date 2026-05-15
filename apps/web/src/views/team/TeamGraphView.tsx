@@ -8,6 +8,7 @@ import type { TeamGraph } from '../../types/index';
 import { NodeSummaryPanel } from './NodeSummaryPanel';
 import { GraphZoomControl } from '../../components/GraphZoomControl';
 import { LABEL_ZOOM_THRESHOLD } from '../../lib/graphStyles';
+import { recomputeNodeRadii } from '../../lib/graphDiff';
 import './team.css';
 
 if (!(cytoscape as any).__colaRegistered) {
@@ -80,17 +81,16 @@ export function TeamGraphView() {
 
     const nbNodes = node.neighborhood().nodes();
     const nbEdges = node.neighborhood().edges();
-    cy.nodes().not(node).not(nbNodes).style({ opacity: 0.2 });
+    // Non-spotlight nodes: turn grey (override per-type color), dim the
+    // colored shadow, hide labels. Spotlight + neighbors keep their colors
+    // from the stylesheet default.
+    cy.nodes().not(node).not(nbNodes).style({
+      'background-color': '#3a3f47',
+      'shadow-color': '#3a3f47',
+      'background-opacity': 0.5,
+      'text-opacity': 0,
+    });
     cy.edges().not(nbEdges).style({ opacity: 0.06 });
-
-    // Restore per-type color on the spotlighted node + its neighbors.
-    const colorize = (el: cytoscape.NodeSingular) => {
-      const type = el.data('nodeType') as string | undefined;
-      const c = type ? NODE_COLORS[type] : undefined;
-      if (c) el.style({ 'background-color': c, 'shadow-color': c });
-    };
-    nbNodes.forEach(colorize);
-    colorize(node as any);
 
     node.style({
       'shadow-blur': 22,
@@ -99,7 +99,7 @@ export function TeamGraphView() {
       color: '#e6edf3',
       'text-opacity': 1,
     });
-    nbNodes.style({ opacity: 0.85, 'background-opacity': 0.95 });
+    nbNodes.style({ 'background-opacity': 1, 'text-opacity': 1 });
     nbEdges.style({ opacity: 0.8, 'line-color': '#fb8500', width: 1.5 });
   }, []);
 
@@ -164,12 +164,15 @@ export function TeamGraphView() {
         {
           selector: 'node',
           style: {
-            // Grey at rest — same as personal graph. Color is restored by
-            // applySpotlight on the hovered/selected node + its neighbors.
-            'background-color': '#3a3f47',
-            'background-opacity': 0.85,
-            width: 32,
-            height: 32,
+            // Per-type color at rest (matches personal graph). The spotlight
+            // handler greys-out non-spotlight nodes inline when active.
+            'background-color': (el: cytoscape.NodeSingular) => NODE_COLORS[el.data('nodeType')] ?? '#7d8590',
+            'background-opacity': 0.9,
+            // Degree-scaled size via shared helper (lib/graphDiff). Stored
+            // in node data so removeStyle() during hover cleanup doesn't
+            // collapse every node back to a uniform default.
+            width: (el: cytoscape.NodeSingular) => (el.data('size') as number | undefined) ?? 32,
+            height: (el: cytoscape.NodeSingular) => (el.data('size') as number | undefined) ?? 32,
             label: 'data(label)',
             'font-size': 11,
             'font-family': 'Inter, system-ui, sans-serif',
@@ -185,11 +188,11 @@ export function TeamGraphView() {
             'text-outline-opacity': 0.8,
             'text-opacity': 1,
             'border-width': 0,
-            'shadow-blur': 4,
-            'shadow-color': '#3a3f47',
+            'shadow-blur': 6,
+            'shadow-color': (el: cytoscape.NodeSingular) => NODE_COLORS[el.data('nodeType')] ?? '#7d8590',
             'shadow-offset-x': 0,
             'shadow-offset-y': 0,
-            'shadow-opacity': 0.4,
+            'shadow-opacity': 0.5,
             'overlay-opacity': 0,
           } as any,
         },
@@ -308,11 +311,7 @@ export function TeamGraphView() {
       setZoomPercent(100);
       refreshLabelVisibility();
 
-      const maxDeg = cy.nodes().reduce((m, n) => Math.max(m, n.degree(true)), 0) || 1;
-      cy.nodes().forEach(n => {
-        const r = 16 + (n.degree(true) / maxDeg) * 24;
-        n.style({ width: r * 2, height: r * 2 });
-      });
+      recomputeNodeRadii(cy);
     }, 1400);
 
     // Hover spotlight — temporary; mouseout either falls back to the

@@ -75,15 +75,46 @@ The RETRIEVAL domain (Nicolo's vertical slice) is fully implemented and merged t
 
 ## Chat API (`routes/chat.ts`)
 
-Streaming via Server-Sent Events. Event sequence:
+Streaming via Server-Sent Events. The chat route is now a **two-path router** (revised 2026-05-15): every incoming message is classified by [[chat-query-classifier]] (Gemini Flash, 2 attempts, 8 s timeout), and the path branches based on the result.
 
-| Order | Event | Payload |
-|---|---|---|
-| 1 | `cited-nodes` | `{ nodeIds: string[], confidence: ConfidenceLevel }` |
-| 2..N | `token` | `{ text: string }` (incremental chunks) |
-| Final | `done` | `{ confidence, sourceCount: number }` |
+### SSE event protocol (revised)
 
-The `cited-nodes` event fires **first** so the frontend can trigger the query overlay while Gemini is still streaming.
+| Order | Event | Payload | Path |
+|---|---|---|---|
+| 1 | `kind` | `{ kind: 'knowledge' \| 'conversational' }` | both |
+| 2 | `cited-nodes` | `{ nodeIds, confidence }` | knowledge only |
+| 3..N | `token` | `{ text }` (incremental) | both |
+| Final | `done` | `{ kind: 'knowledge', confidence, sourceCount }` or `{ kind: 'conversational' }` | both |
+| On error mid-stream | `error` | `{ message }` | both |
+
+The `kind` event fires **before everything else** so the frontend can decide whether to expect a `cited-nodes` event and gate the [[query-overlay-animation]] accordingly. Request body now also accepts `history: ChatTurn[]` (≤8) — see "Conversation history" below.
+
+### Knowledge path
+
+Existing [[rag-query-pipeline]]: query embedding → top-8 cosine search → 1-hop expansion → Gemini Pro streaming synthesis with grounding prompt. **Confidence thresholds re-calibrated**: high ≥3 nodes ≥ 0.75, medium ≥2 nodes ≥ 0.70, low ≥1 node ≥ 0.60, refuse 0 ≥ 0.60. Refusal message now randomized across **4 variants** so the demo doesn't feel scripted.
+
+### Conversational path
+
+`apps/api/src/services/conversational.ts` + `apps/api/src/prompts/conversational.md`. Gemini Flash, no retrieval, free-form streaming under a hard rule against substantive legal claims from training data. See [[conversational-chat-path]].
+
+### Reliability
+
+Every Gemini SDK call (classifier + RAG stream + conversational stream + transcribe + vision + organize + redaction passes + embedding) now goes through [[gemini-retry-backoff|withGeminiRetry]] — exponential backoff + jitter + per-attempt timeout, with retryable-error classification. Streaming connect retries only; mid-stream chunks are not safely retryable.
+
+### Conversation history
+
+`buildHistoryPayload(messages)` in `apps/web/src/api/chat.ts` sends the last 4 turns (≤2 user/assistant pairs). Server schema caps at 8. For assistant turns, `citedNodeIds` are included so the classifier can detect follow-up operations and the conversational prompt can re-quote prior citations. See [[conversational-chat-path]] for the prompt-level history format.
+
+### New supporting files (2026-05-15)
+
+| File | Role |
+|---|---|
+| `services/classifier.ts` | The Gemini Flash classifier — [[chat-query-classifier]] |
+| `services/conversational.ts` | No-retrieval streaming generator — [[conversational-chat-path]] |
+| `services/gemini-retry.ts` | The shared retry/backoff wrapper — [[gemini-retry-backoff]] |
+| `services/promptLoader.ts` | Two-path resolver for `prompts/*.md` (dev tsx vs prod dist) — replaces the inline `readFileSync` previously in `rag.ts` |
+| `prompts/conversational.md` | Conversational system prompt with the hard "no substantive legal claims" rule |
+| `types/chat-protocol.ts` | `ChatKind`, `ChatTurn`, SSE event payload types — shared across classifier + conversational + protocol |
 
 ## Derived edges (Obsidian-style connections)
 
@@ -98,12 +129,19 @@ Phases 1, 3, 4 use `edge_type = 'related_to'`; Phase 2 uses `about`. Visual diff
 
 ## Chat view (`views/chat/ChatView.tsx` + `store/chatStore.ts`)
 
-- On `cited-nodes`: create assistant message with empty `content`, set `overlayActive = true`
-- On `token`: append text to message `.content`
-- On `done`: finalize message, set `overlayActive = false`
-- Auto-scroll to bottom on new messages
-- **Citation chips**: inline `[id]` markers in text are parsed into `Citation` objects; each renders as a chip that opens a node summary panel
-- **Refusal state**: when `confidence === 'refuse'`, the refusal message is shown without a sources panel
+**Revised 2026-05-15 to support the two-path architecture and multi-turn history:**
+
+- **Two-phase send**: on submit, set `isPending = true` (shows thinking dots). On `kind`: if `conversational`, immediately call `startStreaming([], null, 'conversational')`. If `knowledge`, **wait** for `cited-nodes` and then call `startStreaming(nodeIds, confidence, 'knowledge')` — this avoids activating the overlay until we have real node IDs.
+- **Overlay gate**: `overlayActive` in `chatStore` is set to true only when `kind === 'knowledge' && confidence !== 'refuse' && citedNodeIds.length > 0`. Conversational replies and knowledge refusals share the plain thinking-dots loading state without the [[query-overlay-animation]].
+- **History on send**: `buildHistoryPayload(messages)` slices the last 4 turns and includes `citedNodeIds` on assistant turns. Sent as `{ query, history }` on every chat request.
+- **`ChatMessage.kind` field** (added 2026-05-15) — every assistant message now carries `kind: 'knowledge' | 'conversational'` so the renderer can gate UI affordances per-message (SourcesPanel only shows for knowledge, refusal CTA only shows for knowledge refusals).
+- **Stream-error compensation** (commit `a8b4eb3`): if the SSE errors during a `conversational` stream, the error handler **does not stamp `'refuse'` confidence** on the partial message — confidence is a knowledge-path concept. The message stays as-is with whatever content arrived.
+- **Conversation-wide citation resolution** (commit `f971bd0`): the `citedNodeIds` prop passed to `ChatMessage` is a union of every citation ever made in the conversation (`allCitedNodeIds` memo) plus the live streaming set. This lets a conversational follow-up re-quote `[abc12345]` from an earlier knowledge turn and have it resolve to a clickable chip.
+- **Citation chips**: inline `[id]` markers in text are parsed into clickable `CitationChip`s that open the `NodeSummaryPanel`. Parser accepts full UUIDs or 8–12 char hex prefix IDs.
+- **Refusal state**: when `confidence === 'refuse'` on a `knowledge`-kind message, the refusal CTA "Capture your thinking on this" routes to `/capture`. Conversational replies never enter refusal state.
+- **Reset chat button** (working tree, 2026-05-15): header now shows a `Trash2`-iconed pill ("Reset chat") next to the title when `messages.length > 0`. Confirms via `window.confirm`, then calls `chatStore.clearMessages()` which wipes messages + isStreaming + isPending + citedNodeIds + confidence + overlayActive, plus clears selected-node and sources-expanded local state. Hover state turns the pill `#ef476f` (danger red) to telegraph destructive intent. Disabled while `isStreaming || isPending`.
+- **Dim-on-overlay-only fix** (working tree, 2026-05-15): the chat dim cascade was previously gated on `overlayActive || isPending`, which dimmed the chat even for conversational replies (which skip the overlay entirely). Revised to `dimChat = overlayActive` alone — conversational replies and thinking-dots now keep the chat fully readable; only the knowledge-path overlay reveal dims the cascade.
+- **Empty-streaming-bubble suppression** (working tree, 2026-05-15): the assistant message starts with `content === ''`, and the thinking-dots indicator renders separately. Without this fix both rendered, producing two stacked empty bubbles. The new `isEmptyStreamingAssistant` check skips rendering the placeholder bubble when content is empty and streaming is active; the message slot fills in as tokens arrive.
 - **Welcome state** (post-polish, commit `1c836dd`): shown when `messages.length === 0`; greets the lawyer by first name (`Welcome, ${user.displayName.split(' ')[0]}`) and offers 4 suggested queries that auto-submit:
   - "What strategies work for cross-examining expert witnesses?"
   - "How do we handle summary judgment motions?"
