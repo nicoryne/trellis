@@ -13,31 +13,12 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
 import { generateEmbedding } from './embedding';
 import { vectorSearch, expandOneHop } from '../db/queries';
 import { withGeminiRetry } from './gemini-retry';
+import { loadPrompt } from './promptLoader';
 
-/**
- * Resolve prompt file path. Works under both:
- *   - Dev mode (tsx): __dirname = apps/api/src/services
- *   - Production (node dist/): __dirname = apps/api/dist/services
- *     In production, the Dockerfile copies prompts to dist/prompts.
- */
-function resolvePromptPath(): string {
-  // Try relative to __dirname first (works in both tsx and post-copy dist)
-  const localPath = join(__dirname, '../prompts/chat.md');
-  if (existsSync(localPath)) return localPath;
-
-  // Fallback: resolve from cwd (useful for Railway/Docker)
-  const cwdPath = join(process.cwd(), 'src/prompts/chat.md');
-  if (existsSync(cwdPath)) return cwdPath;
-
-  throw new Error('[rag] Cannot find chat.md prompt file');
-}
-
-const chatSystemPrompt = readFileSync(resolvePromptPath(), 'utf-8');
+const chatSystemPrompt = loadPrompt('chat.md');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
