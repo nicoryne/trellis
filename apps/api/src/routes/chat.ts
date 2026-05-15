@@ -2,21 +2,40 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { auth } from '../middleware/auth';
 import { retrieveContext, streamRagResponse } from '../services/rag';
+import { classifyQuery } from '../services/classifier';
+import { streamConversationalResponse } from '../services/conversational';
 
 const router = Router();
 
 const chatSchema = z.object({
   query: z.string().min(1).max(10_000),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string(),
+        citedNodeIds: z.array(z.string()).optional(),
+      })
+    )
+    .max(8)
+    .optional(),
 });
 
 /**
  * POST /api/chat
  * RAG query with Server-Sent Events streaming.
  *
- * SSE event protocol:
- *   event: cited-nodes   → { nodeIds: string[], confidence: string }
- *   event: token         → { text: string }
- *   event: done          → { confidence: string, sourceCount: number }
+ * Two paths, selected by a Gemini Flash classifier:
+ *   - knowledge:     existing retrieval + grounded answer
+ *   - conversational: no retrieval; relaxed prompt with hard rule against
+ *                     substantive legal claims from training data
+ *
+ * SSE event protocol (kind emitted first):
+ *   event: kind          → { kind: "knowledge" | "conversational" }
+ *   event: cited-nodes   → { nodeIds, confidence }      (knowledge only)
+ *   event: token         → { text }                     (both)
+ *   event: done          → { kind, confidence, sourceCount } | { kind: "conversational" }
+ *   event: error         → { message }
  */
 router.post('/', auth, async (req: Request, res: Response) => {
   const parsed = chatSchema.safeParse(req.body);
@@ -30,13 +49,11 @@ router.post('/', auth, async (req: Request, res: Response) => {
     });
   }
 
-  const { query } = parsed.data;
+  const { query, history = [] } = parsed.data;
 
   try {
-    // Step 1: Retrieve context (vector search + graph expansion)
-    const { citedNodeIds, confidence, contexts } = await retrieveContext(query);
+    const kind = await classifyQuery(query, history);
 
-    // Set up SSE headers
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -44,32 +61,33 @@ router.post('/', auth, async (req: Request, res: Response) => {
       'X-Accel-Buffering': 'no',
     });
 
-    // Step 2: Send cited node IDs (triggers overlay animation on frontend)
-    res.write(
-      `event: cited-nodes\ndata: ${JSON.stringify({
-        nodeIds: citedNodeIds,
-        confidence,
-      })}\n\n`
-    );
+    res.write(`event: kind\ndata: ${JSON.stringify({ kind })}\n\n`);
 
-    // Step 3: Stream response tokens
-    const stream = streamRagResponse(query, contexts, confidence);
-    for await (const chunk of stream) {
-      res.write(`event: token\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
+    if (kind === 'knowledge') {
+      const { citedNodeIds, confidence, contexts } = await retrieveContext(query);
+      res.write(
+        `event: cited-nodes\ndata: ${JSON.stringify({ nodeIds: citedNodeIds, confidence })}\n\n`
+      );
+      const stream = streamRagResponse(query, contexts, confidence);
+      for await (const chunk of stream) {
+        res.write(`event: token\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
+      }
+      res.write(
+        `event: done\ndata: ${JSON.stringify({ kind: 'knowledge', confidence, sourceCount: contexts.length })}\n\n`
+      );
+    } else {
+      const stream = streamConversationalResponse(query, history);
+      for await (const chunk of stream) {
+        res.write(`event: token\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
+      }
+      res.write(
+        `event: done\ndata: ${JSON.stringify({ kind: 'conversational' })}\n\n`
+      );
     }
-
-    // Step 4: Send done event
-    res.write(
-      `event: done\ndata: ${JSON.stringify({
-        confidence,
-        sourceCount: contexts.length,
-      })}\n\n`
-    );
 
     res.end();
   } catch (err) {
-    console.error('[chat] RAG query failed:', err);
-    // If headers haven't been sent yet, return JSON error
+    console.error('[chat] failed:', err);
     if (!res.headersSent) {
       return res.status(500).json({
         error: {
@@ -79,11 +97,8 @@ router.post('/', auth, async (req: Request, res: Response) => {
         },
       });
     }
-    // If streaming already started, send error as SSE event
     res.write(
-      `event: error\ndata: ${JSON.stringify({
-        message: 'Stream interrupted',
-      })}\n\n`
+      `event: error\ndata: ${JSON.stringify({ message: 'Stream interrupted' })}\n\n`
     );
     res.end();
   }
