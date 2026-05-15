@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import type { ChatMessage, ConfidenceLevel } from '../types';
+import type { ChatKind, ChatMessage, ConfidenceLevel } from '../types';
 
 interface ChatState {
   messages: ChatMessage[];
   isStreaming: boolean;
-  isPending: boolean; // Submitted; awaiting first response event (cited-nodes or done)
+  isPending: boolean; // Submitted; awaiting first response event (kind)
   citedNodeIds: string[];
   confidence: ConfidenceLevel | null;
   overlayActive: boolean;
@@ -12,9 +12,22 @@ interface ChatState {
   // Actions
   addUserMessage: (content: string) => string;
   setPending: (pending: boolean) => void;
-  startStreaming: (citedNodeIds: string[], confidence: ConfidenceLevel) => void;
+  /**
+   * Start streaming an assistant message. For conversational kind, pass [] and null;
+   * the overlay stays off. For knowledge kind, pass real citedNodeIds + confidence;
+   * the overlay activates iff confidence !== 'refuse' and there are citations.
+   */
+  startStreaming: (
+    citedNodeIds: string[],
+    confidence: ConfidenceLevel | null,
+    kind: ChatKind
+  ) => void;
   appendToken: (messageId: string, text: string) => void;
-  finishStreaming: (messageId: string, confidence: ConfidenceLevel, sourceCount: number) => void;
+  finishStreaming: (
+    messageId: string,
+    confidence: ConfidenceLevel | null,
+    sourceCount: number
+  ) => void;
   setOverlayActive: (active: boolean) => void;
   clearMessages: () => void;
 }
@@ -47,14 +60,15 @@ export const useChatStore = create<ChatState>((set) => ({
     return id;
   },
 
-  startStreaming: (citedNodeIds: string[], confidence: ConfidenceLevel) => {
+  startStreaming: (citedNodeIds, confidence, kind) => {
     const id = generateId();
     const message: ChatMessage = {
       id,
       role: 'assistant',
       content: '',
       citedNodeIds,
-      confidence,
+      confidence: confidence ?? undefined,
+      kind,
       timestamp: Date.now(),
     };
     set((state) => ({
@@ -63,9 +77,10 @@ export const useChatStore = create<ChatState>((set) => ({
       isPending: false,
       citedNodeIds,
       confidence,
-      // Skip the overlay for refusals or empty-citation responses — the hero animation
-      // requires actual nodes to be meaningful (design-guidelines §8.3).
-      overlayActive: confidence !== 'refuse' && citedNodeIds.length > 0,
+      // Overlay only fires for the knowledge path with real citations.
+      // Conversational replies and refusals share the plain loading state.
+      overlayActive:
+        kind === 'knowledge' && confidence !== 'refuse' && citedNodeIds.length > 0,
     }));
   },
 
@@ -80,11 +95,15 @@ export const useChatStore = create<ChatState>((set) => ({
     }));
   },
 
-  finishStreaming: (_messageId: string, confidence: ConfidenceLevel, sourceCount: number) => {
+  finishStreaming: (_messageId, confidence, sourceCount) => {
     set((state) => ({
       messages: state.messages.map((m, i) => {
         if (i === state.messages.length - 1 && m.role === 'assistant') {
-          return { ...m, confidence, sourceCount };
+          return {
+            ...m,
+            confidence: confidence ?? m.confidence,
+            sourceCount,
+          };
         }
         return m;
       }),
