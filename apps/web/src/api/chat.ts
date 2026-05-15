@@ -1,14 +1,33 @@
-import type { ConfidenceLevel } from '../types';
+import type { ChatKind, ChatMessage, ConfidenceLevel } from '../types';
 
 const BASE_URL = typeof import.meta !== 'undefined'
   ? (import.meta.env?.VITE_API_URL ?? '')
   : '';
 
+export type ChatHistoryTurn = {
+  role: 'user' | 'assistant';
+  content: string;
+  citedNodeIds?: string[];
+};
+
 interface ChatSSECallbacks {
+  onKind: (kind: ChatKind) => void;
   onCitedNodes: (nodeIds: string[], confidence: ConfidenceLevel) => void;
   onToken: (text: string) => void;
-  onDone: (confidence: ConfidenceLevel, sourceCount: number) => void;
+  onDone: (payload: { kind: ChatKind; confidence?: ConfidenceLevel; sourceCount?: number }) => void;
   onError: (message: string) => void;
+}
+
+/**
+ * Build the history payload to send with a chat request — last 4 messages
+ * (typically 2 user/assistant pairs). Server caps at 8.
+ */
+export function buildHistoryPayload(messages: ChatMessage[]): ChatHistoryTurn[] {
+  return messages.slice(-4).map((m) => ({
+    role: m.role,
+    content: m.content,
+    citedNodeIds: m.role === 'assistant' ? m.citedNodeIds : undefined,
+  }));
 }
 
 /**
@@ -17,6 +36,7 @@ interface ChatSSECallbacks {
  */
 export async function streamChat(
   query: string,
+  history: ChatHistoryTurn[],
   token: string | null,
   callbacks: ChatSSECallbacks
 ): Promise<void> {
@@ -30,7 +50,7 @@ export async function streamChat(
   const response = await fetch(`${BASE_URL}/api/chat`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, history }),
   });
 
   if (!response.ok) {
@@ -55,9 +75,8 @@ export async function streamChat(
 
     buffer += decoder.decode(value, { stream: true });
 
-    // Parse SSE events from buffer
     const lines = buffer.split('\n');
-    buffer = lines.pop() ?? ''; // Keep incomplete line in buffer
+    buffer = lines.pop() ?? '';
 
     let eventType = '';
     let eventData = '';
@@ -68,10 +87,12 @@ export async function streamChat(
       } else if (line.startsWith('data: ')) {
         eventData = line.slice(6);
       } else if (line === '' && eventType && eventData) {
-        // End of event — dispatch
         try {
           const parsed = JSON.parse(eventData);
           switch (eventType) {
+            case 'kind':
+              callbacks.onKind(parsed.kind);
+              break;
             case 'cited-nodes':
               callbacks.onCitedNodes(parsed.nodeIds, parsed.confidence);
               break;
@@ -79,7 +100,11 @@ export async function streamChat(
               callbacks.onToken(parsed.text);
               break;
             case 'done':
-              callbacks.onDone(parsed.confidence, parsed.sourceCount);
+              callbacks.onDone({
+                kind: parsed.kind,
+                confidence: parsed.confidence,
+                sourceCount: parsed.sourceCount,
+              });
               break;
             case 'error':
               callbacks.onError(parsed.message);

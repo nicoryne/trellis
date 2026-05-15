@@ -96,18 +96,25 @@ export function applyGraphDiff(cy: Core, targetElements: CytoscapeElement[]): bo
 }
 
 /**
- * Recompute degree-scaled node sizes after a diff. Leaves sit at 16px radius
- * (32px diameter — matches stylesheet base), the most-connected node sits at
- * 40px radius (80px diameter), everything else interpolates.
- * Hub nodes (classification anchors) are exempt — they have their own style.
+ * Recompute degree-scaled node sizes. Leaves sit at 32px diameter, the most
+ * connected node sits at 80px, everything else interpolates. Hub nodes
+ * (classification anchors) get a fixed 44px size.
+ *
+ * Sizes are stored as node **data** (`size`), not inline style, so they
+ * survive the `cy.nodes().removeStyle()` calls that clearSpotlight uses to
+ * reset hover bypasses. The stylesheet's `width`/`height` read this data.
  */
 export function recomputeNodeRadii(cy: Core): void {
-  const maxDeg = cy.nodes().reduce((m, n) => Math.max(m, n.degree(true)), 0) || 1;
+  const nodes = cy.nodes();
+  const maxDeg = nodes.reduce((m, n) => Math.max(m, n.degree(true)), 0) || 1;
   cy.batch(() => {
-    cy.nodes().forEach(n => {
-      if (n.data('isHub')) return;
+    nodes.forEach(n => {
+      if (n.data('isHub')) {
+        n.data('size', 44);
+        return;
+      }
       const r = 16 + (n.degree(true) / maxDeg) * 24;
-      n.style({ width: r * 2, height: r * 2 });
+      n.data('size', r * 2);
     });
   });
 }

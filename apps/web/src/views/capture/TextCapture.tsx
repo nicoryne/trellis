@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useNoteStore } from '../../store/noteStore';
+import { useNoteStore, type OrganizeSnapshot } from '../../store/noteStore';
 import { useAuthStore } from '../../store/authStore';
 import { organizeNote } from '../../api/client';
 import { OrganizePanel } from './OrganizePanel';
@@ -23,12 +23,18 @@ export default function TextCapture() {
     classification?: NoteClassification;
     isPrivileged?: boolean;
   }>({});
+  // Snapshot of organize-relevant state captured right before the most recent
+  // Gemini call. Presence of a snapshot enables the Revert button; clearing it
+  // (on note switch, on revert, or on a successful new organize after revert)
+  // removes the Revert affordance.
+  const [preOrganizeSnapshot, setPreOrganizeSnapshot] = useState<OrganizeSnapshot | null>(null);
   const [panelCollapsed, setPanelCollapsed] = useState<boolean>(
     () => localStorage.getItem(PANEL_COLLAPSED_KEY) === '1'
   );
 
   const {
-    saveNote, setActiveNote, applyAiOrganize, setClassification, setPrivilege, notes, activeNoteId,
+    saveNote, setActiveNote, applyAiOrganize, restoreOrganizeSnapshot,
+    setClassification, setPrivilege, notes, activeNoteId,
   } = useNoteStore();
   const token = useAuthStore(s => s.token);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,6 +70,8 @@ export default function TextCapture() {
     }
     setSuggestions({});
     setOrganizeError(null);
+    setPreOrganizeSnapshot(null);
+    setLastOrganizedAt(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeNoteId]);
 
@@ -112,6 +120,19 @@ export default function TextCapture() {
     const id = noteIdRef.current;
     if (!id) return;
     if (body.trim().length < ORGANIZE_MIN_CHARS) return;
+    // Snapshot the organize-relevant fields *before* mutating, so Revert can
+    // restore exactly this state. Read from the current note in store (which
+    // may differ from `activeNote` closure if a save just landed).
+    const current = useNoteStore.getState().notes.find(n => n.id === id);
+    const snapshot: OrganizeSnapshot | null = current
+      ? {
+          extractedEntities: current.extractedEntities,
+          classification: current.classification,
+          isPrivileged: current.isPrivileged,
+          organizeProvenance: current.organizeProvenance,
+          dismissedEntityKeys: current.dismissedEntityKeys,
+        }
+      : null;
     setIsOrganizing(true);
     setOrganizeError(null);
     const resp = await organizeNote(body, token ?? '');
@@ -124,7 +145,18 @@ export default function TextCapture() {
       const { suggestions: s } = await applyAiOrganize(id, resp.data);
       setSuggestions(s);
       setLastOrganizedAt(Date.now());
+      setPreOrganizeSnapshot(snapshot);
     }
+  }
+
+  async function handleRevert() {
+    const id = noteIdRef.current;
+    if (!id || !preOrganizeSnapshot) return;
+    await restoreOrganizeSnapshot(id, preOrganizeSnapshot);
+    setPreOrganizeSnapshot(null);
+    setSuggestions({});
+    setLastOrganizedAt(null);
+    setOrganizeError(null);
   }
 
   function insertLinkLabel(label: string) {
@@ -211,6 +243,8 @@ export default function TextCapture() {
         organizeError={organizeError}
         lastOrganizedAt={lastOrganizedAt}
         suggestions={suggestions}
+        canRevert={!!preOrganizeSnapshot}
+        onRevert={handleRevert}
         onAcceptClassificationSuggestion={acceptClassificationSuggestion}
         onDismissClassificationSuggestion={dismissClassificationSuggestion}
         onAcceptPrivilegeSuggestion={acceptPrivilegeSuggestion}

@@ -157,6 +157,8 @@ export interface TeamGraph {
   edges: TeamGraphEdge[];
 }
 
+export type ChatKind = 'knowledge' | 'conversational';
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -165,6 +167,8 @@ export interface ChatMessage {
   confidence?: ConfidenceLevel;
   sourceCount?: number;
   citedNodeIds?: string[];
+  /** 'knowledge' for RAG-grounded answers, 'conversational' for chat replies. Assistant messages only. */
+  kind?: ChatKind;
   timestamp: number;
 }
 

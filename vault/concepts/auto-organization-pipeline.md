@@ -50,6 +50,7 @@ A **single structured-output [[gemini|Gemini Pro]] call** that returns extracted
 - **Max entities per note**: 0–10; do not force-extract if entities are not clearly present
 - **Normalization**: canonical entity names (`"Judge Cruz"`, not `"the judge"`)
 - **Route**: `POST /api/organize` — accepts note content (string), returns `{ entities, classification, isPrivileged }`; requires valid JWT
+- **Reliability** (added 2026-05-15): wrapped in [[gemini-retry-backoff|withGeminiRetry]]. Default 3 attempts, 30 s per-attempt timeout, exponential backoff with full jitter. Transient 429/5xx hiccups no longer surface to the user as a 500.
 
 ## Frontend integration — the Organize panel
 
@@ -73,7 +74,9 @@ Surface: `apps/web/src/views/capture/OrganizePanel.tsx` (right rail on TextCaptu
 - "× Remove" on any entity chip — drops the entity; AI-provenance entities are also added to `dismissedEntityKeys`.
 - "+ Add link" → opens `LinkQuickPick`, inserts `[[Title]]` at cursor (see [[note-wikilinks]]).
 
-The panel footer displays the last-organized timestamp ("3 min ago") and a disabled state below the 20-char threshold so the budget reason is visible.
+**Revert button (added 2026-05-15)**: TextCapture snapshots the organize-relevant fields (`extractedEntities`, `classification`, `isPrivileged`, `organizeProvenance`, `dismissedEntityKeys`) **right before** every Gemini call. While that snapshot exists, the panel footer swaps the primary button from "Organize with Gemini" → **"Revert"** (Undo2 icon). Click restores all five fields atomically via `noteStore.restoreOrganizeSnapshot(noteId, snapshot)` and clears the snapshot. Switching to a different note clears the snapshot too. This gives the user a one-click undo for "I didn't want what Gemini just did" without per-field accept/reject choreography.
+
+The panel footer displays the last-organized timestamp ("3 min ago") when no revert is available, and a disabled state below the 20-char threshold so the budget reason is visible.
 
 ## Acceptance criteria (per [[trellis-product-requirements]] §2.3)
 
@@ -85,10 +88,11 @@ The panel footer displays the last-organized timestamp ("3 min ago") and a disab
 
 ## Edge cases
 
-- **Extraction failure (API error)**: note is saved without enrichment; error surfaces inline in the panel footer; "Organize with Gemini" can be re-clicked.
+- **Extraction failure (transient API error)**: [[gemini-retry-backoff|withGeminiRetry]] handles transient 429/5xx with exponential backoff before surfacing the error. Only after exhausted attempts does the error surface inline in the panel footer; "Organize with Gemini" can be re-clicked.
 - **Duplicate entities** (same type + name): deduplicated by `type:name` key in both `organizeMerge.ts` and `graphUtils.ts`.
 - **Low-confidence entities** (below 0.5): excluded entirely (not suggested).
 - **User has edited fields manually before clicking organize**: AI value is held in suggestions, never silently overwrites — see provenance table above.
+- **User regrets the AI pass after the fact**: one click on Revert restores the exact pre-call state (entities + classification + privilege + provenance + dismissed-keys), atomically.
 
 ## Why a single call
 

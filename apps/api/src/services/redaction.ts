@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
+import { withGeminiRetry } from './gemini-retry';
 
 dotenv.config();
 dotenv.config({ path: '.env.local', override: true });
@@ -104,20 +105,31 @@ function regexFallback(text: string): { tokenized: string; redactions: Redaction
 // Pass 2: Gemini Pro generalization
 async function geminiGeneralize(tokenizedText: string): Promise<string> {
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
-  const result = await model.generateContent([
-    { text: redactPrompt },
-    { text: tokenizedText },
-  ]);
+  const result = await withGeminiRetry(
+    (opts) =>
+      model.generateContent(
+        [{ text: redactPrompt }, { text: tokenizedText }],
+        opts
+      ),
+    { label: 'redact.generalize', timeoutMs: 30_000 }
+  );
   return result.response.text().trim();
 }
 
 // Preservation score: Gemini Flash
 async function geminiPreservationScore(original: string, sanitized: string): Promise<number> {
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  const result = await model.generateContent([
-    { text: preservePrompt },
-    { text: `ORIGINAL:\n${original}\n\nSANITIZED:\n${sanitized}` },
-  ]);
+  const result = await withGeminiRetry(
+    (opts) =>
+      model.generateContent(
+        [
+          { text: preservePrompt },
+          { text: `ORIGINAL:\n${original}\n\nSANITIZED:\n${sanitized}` },
+        ],
+        opts
+      ),
+    { label: 'redact.preserve', timeoutMs: 20_000 }
+  );
 
   try {
     const parsed = JSON.parse(result.response.text().trim()) as { score: number };

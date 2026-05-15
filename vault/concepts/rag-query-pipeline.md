@@ -10,7 +10,9 @@ updated: 2026-05-15
 
 # RAG query pipeline
 
-The retrieval and synthesis pipeline behind [[trellis|Trellis]]'s chat-with-team-brain feature. Embed the query → vector similarity search → 1-hop graph expansion → grounded synthesis with inline node-ID citations. Triggers the [[query-overlay-animation]] in parallel.
+The retrieval and synthesis pipeline behind [[trellis|Trellis]]'s chat-with-team-brain feature — the **knowledge path** in the two-path chat architecture. Embed the query → vector similarity search → 1-hop graph expansion → grounded synthesis with inline node-ID citations. Triggers the [[query-overlay-animation]] in parallel.
+
+**Classifier-gated (added 2026-05-15)**: every chat message first goes through [[chat-query-classifier]], which decides between `knowledge` (this pipeline) and `conversational` ([[conversational-chat-path]] — no retrieval). The pipeline below runs only when the classifier returns `kind: 'knowledge'`.
 
 ## Sequence
 
@@ -37,12 +39,16 @@ The retrieval and synthesis pipeline behind [[trellis|Trellis]]'s chat-with-team
 - **Output structured response** with inline `[node_id]` markers.
 - See [[citation-grounding]] for the full discipline.
 
-## Confidence buckets
+## Confidence buckets (re-calibrated 2026-05-15)
 
-- **High** — 3+ nodes above 0.80 similarity, all in the same topical cluster
-- **Medium** — 2+ nodes above 0.70, mixed clusters
-- **Low** — only 1 node above 0.75, or several below 0.70
-- **Refuse** — zero nodes above 0.75 (no answer attempted)
+Empirically re-calibrated against `gemini-embedding-001` actual distributions on the seeded corpus (see `apps/api/src/diagnostics-similarity.ts`). Even tightly-matched queries — e.g. *"How does Judge Buenaventura handle motions"* against 6 dedicated Buenaventura insights — cap around **0.80** cosine similarity, so the old "≥0.80 = high" threshold was unreachable in practice. New thresholds:
+
+| Level | Rule | Meaning |
+|---|---|---|
+| `high` | ≥3 nodes ≥ 0.75 | Multiple strongly on-topic hits |
+| `medium` | ≥2 nodes ≥ 0.70 | Solid but thinner — one strong + adjacent |
+| `low` | ≥1 node ≥ 0.60 | A single weakly-related hit |
+| `refuse` | 0 nodes ≥ 0.60 | No answer attempted |
 
 The confidence indicator is a small pill in the chat UI: green/amber/red dot + label, drawn from the **semantic** palette (`success`, `warning`, `danger`) — unaffected by the 2026-05-14 accent revision from amber-gold to orange. Sources section is collapsed for High, expanded for Medium/Low.
 
@@ -62,9 +68,14 @@ Pure top-k embedding similarity misses the relational structure of the team grap
 - **Final cosine threshold**: **0.55** for context inclusion (matches spec)
 - **Graph expansion**: 1-hop; **only `insight`-type neighbors are added to the context** — entity neighbors (`matter`, `party`, `lawyer`, `judge`, `witness`, `concept`, `precedent`, `statute`) are walked but not synthesized over. Keeps the context focused on synthesizable claims.
 - **Synthesis model**: `gemini-2.5-pro`, streaming
-- **System prompt**: `apps/api/src/prompts/chat.md`
-- **Refusal message** (exact text): *"I don't have firm knowledge that directly addresses this. You may want to capture your own thinking on this topic as a starting point."*
-- **SSE event sequence**: (1) `cited-nodes` with `{ nodeIds, confidence }`, then (2..N) `token` events with `{ text }`, finally `done` with `{ confidence, sourceCount }`. The `cited-nodes` event fires **first** so the frontend can trigger the [[query-overlay-animation]] while Gemini is still streaming.
+- **System prompt**: `apps/api/src/prompts/chat.md` (loaded once at module scope via the shared `promptLoader.ts` helper).
+- **Reliability**: the initial stream connect is wrapped in [[gemini-retry-backoff|withGeminiRetry]]; mid-stream chunks are **not** retryable (partial output may already have reached the user).
+- **Refusal message — random variant (added 2026-05-15)**: one of four phrasings is picked at random per refused query so the demo doesn't feel scripted. All variants share the same intent (acknowledge gap, invite capture):
+  - *"I don't have firm knowledge that directly addresses this. You may want to capture your own thinking on this topic as a starting point."*
+  - *"The firm brain doesn't have material covering this question. Consider opening a capture and starting the record yourself — your notes today become tomorrow's institutional memory."*
+  - *"No published insights in the team graph speak to this directly. This looks like an open area for the firm's knowledge — your capture could be the first entry."*
+  - *"I couldn't find firm knowledge on this. Rather than synthesize from general legal training, I'd rather defer — this is a good prompt for a fresh personal capture."*
+- **SSE event sequence (revised 2026-05-15)**: (1) `kind` event with `{ kind: 'knowledge' }` from the classifier, then (2) `cited-nodes` with `{ nodeIds, confidence }`, then (3..N) `token` events with `{ text }`, finally `done` with `{ kind: 'knowledge', confidence, sourceCount }`. The `kind` event fires **before** anything else so the frontend can decide whether to expect `cited-nodes` and gate the [[query-overlay-animation]] accordingly. For the conversational branch, the protocol omits `cited-nodes` and emits `done` with `{ kind: 'conversational' }` only.
 - **Citation format**: inline `[node_id]` markers in the response body; Sources section after `---` lists `[id] Title`
 
 See [[trellis-retrieval-implementation]] for the full breakdown.
