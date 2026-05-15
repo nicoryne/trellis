@@ -125,6 +125,21 @@ export const ChatView: React.FC = () => {
   // Dim chat from submission through overlay reveal
   const dimChat = overlayActive || isPending;
 
+  // Resolution set for citation chips: every node ID ever cited in this
+  // conversation. Lets conversational follow-ups re-quote prior-turn citations.
+  const allCitedNodeIds = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const m of messages) {
+      if (m.role === 'assistant' && m.citedNodeIds) {
+        for (const id of m.citedNodeIds) set.add(id);
+      }
+    }
+    // Also include the live streaming set (in case the current turn's IDs
+    // haven't been persisted to the message yet).
+    for (const id of citedNodeIds) set.add(id);
+    return Array.from(set);
+  }, [messages, citedNodeIds]);
+
   return (
     <div className="chat-root">
       <div className={`chat-content${dimChat ? ' chat-content--dimmed' : ''}`}>
@@ -172,7 +187,7 @@ export const ChatView: React.FC = () => {
               message={msg}
               isStreaming={isStreaming && msg === messages[messages.length - 1]}
               onCitationClick={setSelectedNodeId}
-              citedNodeIds={citedNodeIds}
+              citedNodeIds={allCitedNodeIds}
             />
             {/* Sources panel — only after the latest assistant message, never on refusals */}
             {msg.role === 'assistant' &&
