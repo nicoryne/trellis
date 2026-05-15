@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useChatStore } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
-import { streamChat } from '../../api/chat';
+import { streamChat, buildHistoryPayload } from '../../api/chat';
 import { ChatMessageComponent } from './ChatMessage';
 import { NodeSummaryPanel } from './NodeSummaryPanel';
 import { SourcesPanel } from './SourcesPanel';
@@ -63,21 +63,29 @@ export const ChatView: React.FC = () => {
 
     if (!overrideQuery) setInput('');
     addUserMessage(query);
-    // Dim chat immediately on submit (design-guidelines §8.3 step 2).
     setPending(true);
 
+    const history = buildHistoryPayload(messages);
+
     try {
-      await streamChat(query, token, {
+      await streamChat(query, history, token, {
+        onKind: (kind) => {
+          // For conversational replies, start streaming immediately — there
+          // is no cited-nodes event coming. For knowledge replies, wait for
+          // onCitedNodes so the overlay can read real node IDs.
+          if (kind === 'conversational') {
+            startStreaming([], null, 'conversational');
+          }
+        },
         onCitedNodes: (nodeIds, confidence) => {
-          startStreaming(nodeIds, confidence);
-          // Expand sources by default for medium/low confidence
+          startStreaming(nodeIds, confidence, 'knowledge');
           setSourcesExpanded(confidence === 'medium' || confidence === 'low');
         },
         onToken: (text) => {
           appendToken('', text);
         },
-        onDone: (confidence, sourceCount) => {
-          finishStreaming('', confidence, sourceCount);
+        onDone: ({ confidence, sourceCount }) => {
+          finishStreaming('', confidence ?? null, sourceCount ?? 0);
         },
         onError: (message) => {
           console.error('[chat] Stream error:', message);
@@ -90,7 +98,7 @@ export const ChatView: React.FC = () => {
     } finally {
       setPending(false);
     }
-  }, [input, isStreaming, isPending, token, addUserMessage, setPending, startStreaming, appendToken, finishStreaming]);
+  }, [input, isStreaming, isPending, token, messages, addUserMessage, setPending, startStreaming, appendToken, finishStreaming]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -110,7 +118,10 @@ export const ChatView: React.FC = () => {
   const canSend = input.trim() && !isStreaming && !isPending;
   const lastMsg = messages[messages.length - 1];
   const isLastAssistantRefusal =
-    lastMsg?.role === 'assistant' && !isStreaming && lastMsg.confidence === 'refuse';
+    lastMsg?.role === 'assistant' &&
+    !isStreaming &&
+    lastMsg.kind === 'knowledge' &&
+    lastMsg.confidence === 'refuse';
   // Dim chat from submission through overlay reveal
   const dimChat = overlayActive || isPending;
 
@@ -167,6 +178,7 @@ export const ChatView: React.FC = () => {
             {msg.role === 'assistant' &&
               !isStreaming &&
               msg === messages[messages.length - 1] &&
+              msg.kind === 'knowledge' &&
               msg.confidence !== 'refuse' &&
               citedNodeIds.length > 0 && (
                 <SourcesPanel
