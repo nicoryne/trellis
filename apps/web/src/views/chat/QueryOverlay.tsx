@@ -122,9 +122,15 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // Read the canvas's *own* size, not the viewport — the overlay is now
+    // scoped to the chat-root area, not the whole window.
+    const measure = () => {
+      const rect = canvas.getBoundingClientRect();
+      return { w: rect.width, h: rect.height };
+    };
+
     const layoutNodes = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+      const { w, h } = measure();
       const cx = w / 2;
       const cy = h / 2;
       const radius = Math.min(w, h) * 0.32;
@@ -143,8 +149,7 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
     };
 
     let positions = layoutNodes();
-    let lastW = window.innerWidth;
-    let lastH = window.innerHeight;
+    let { w: lastW, h: lastH } = measure();
 
     const activationStart = (citedIndex: number) =>
       FADE_IN_MS + citedIndex * PULSE_STAGGER_MS;
@@ -176,9 +181,10 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
         if (envelope <= 0) { setVisible(false); return; }
       }
 
-      if (window.innerWidth !== lastW || window.innerHeight !== lastH) {
-        lastW = window.innerWidth;
-        lastH = window.innerHeight;
+      const cur = measure();
+      if (cur.w !== lastW || cur.h !== lastH) {
+        lastW = cur.w;
+        lastH = cur.h;
         positions = layoutNodes();
       }
       const dpr = window.devicePixelRatio || 1;
@@ -275,9 +281,9 @@ export const QueryOverlay: React.FC<QueryOverlayProps> = ({
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
       style={{
-        position: 'fixed',
+        position: 'absolute',
         inset: 0,
-        zIndex: 900,
+        zIndex: 5,
         backgroundColor: 'rgba(13, 17, 23, 0.94)',
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',

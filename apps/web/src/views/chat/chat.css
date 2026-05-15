@@ -103,9 +103,12 @@
   align-items: stretch;
 }
 
-/* Inner content cap — every message + sources panel sits inside this width */
+/* Inner content cap — every message + sources panel sits inside this width.
+   Wider than 820px so user bubbles (right-aligned) actually travel toward the
+   right edge of the chat area instead of stopping mid-canvas. The individual
+   bubbles still cap their own widths via .chat-message-content max-widths. */
 .chat-messages > * {
-  max-width: 820px;
+  max-width: 1180px;
   width: 100%;
   margin-left: auto;
   margin-right: auto;
@@ -197,7 +200,9 @@
 }
 
 .chat-message--user {
-  justify-content: flex-end;
+  /* row-reverse inverts the main axis, so flex-start packs items at the
+     visual right edge of the row. flex-end would pack them to the left. */
+  justify-content: flex-start;
   flex-direction: row-reverse;
 }
 

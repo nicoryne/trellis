@@ -26,6 +26,7 @@ Google's frontier LLM family. Trellis MVP uses three variants plus an embedding 
 - **[[auto-organization-pipeline]]**: single structured-output Gemini Pro call returns `{ entities, classification, isPrivileged }`.
 - **[[redaction-pipeline]]**: Pass 2 generalization rewrites specifics to legal-principle level. Pass 4 (preservation) at V1 is a dedicated Gemini call.
 - **[[rag-query-pipeline]]**: streams the response with system-prompt-enforced grounding and inline `[node_id]` citations; refuses if no nodes above 0.75 similarity.
+- **Audio transcription** (added 2026-05-14): Gemini 2.5 Flash via `inlineData` (base64 WebM/Opus) on `POST /api/transcribe`. Replaced [[whisper|OpenAI Whisper]] to consolidate on a single API key.
 
 ## Cost envelope (MVP demo period)
 
@@ -41,7 +42,7 @@ Trellis qualifies for the **Gemini Award**: Gemini powers extraction, redaction,
 - **Used by**: [[trellis]] across all three AI pipelines
 - **Complement (V1)**: [[gemma]] for on-device personal-layer extraction
 - **Sees only sanitized content** after [[redaction-pipeline]] for published content
-- **Audio transcription is not Gemini**: [[whisper]] handles that
+- **Replaced** [[whisper]] for MVP audio transcription (2026-05-14)
 
 ## Open questions
 

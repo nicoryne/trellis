@@ -30,3 +30,31 @@ export async function fetchNodeById(id: string, token: string): Promise<ApiRespo
     return { error: { code: 'NETWORK_ERROR', message: err instanceof Error ? err.message : 'Network error', retryable: true } };
   }
 }
+
+export async function deleteTeamGraphNode(id: string, token: string): Promise<ApiResponse<{ id: string }>> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/team-graph/nodes/${id}`, {
+      method: 'DELETE',
+      headers: authHeader(token),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        error: {
+          code: String(res.status),
+          message: json.error?.message ?? 'Failed to delete',
+          retryable: res.status >= 500,
+        },
+      };
+    }
+    return { data: json.data };
+  } catch (err) {
+    return {
+      error: {
+        code: 'NETWORK_ERROR',
+        message: err instanceof Error ? err.message : 'Network error',
+        retryable: true,
+      },
+    };
+  }
+}

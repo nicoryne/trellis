@@ -3,6 +3,11 @@
 @import "tailwindcss";
 
 :root {
+  /* Tells the browser to render native form controls in their dark variant.
+     Without this, Chromium on Windows uses the light checkbox skin which
+     ignores accent-color, producing a blue check on white. */
+  color-scheme: dark;
+
   /* Base */
   --bg-canvas: #0d1117;
   --bg-surface: #161b22;

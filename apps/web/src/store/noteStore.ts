@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import * as idb from '../lib/idb';
 import { parseWikilinks, resolveWikilinks } from '../lib/wikilinks';
 import { mergeOrganize } from '../lib/organizeMerge';
+import { deleteTeamGraphNode } from '../api/teamGraph';
+import { useAuthStore } from './authStore';
 import type {
   PersonalNote,
   NoteFolder,
@@ -21,7 +23,7 @@ interface NoteState {
     data: Omit<PersonalNote, 'id' | 'createdAt' | 'updatedAt'>,
     existingId?: string
   ) => Promise<PersonalNote>;
-  deleteNote: (id: string) => Promise<void>;
+  deleteNote: (id: string) => Promise<{ unpublishedFromTeam: boolean; teamError?: string }>;
   setActiveNote: (id: string | null) => void;
   updateNoteOrganization: (id: string, result: OrganizeResponse) => Promise<void>;
   removeEntity: (noteId: string, entityId: string) => Promise<void>;
@@ -75,11 +77,33 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   deleteNote: async (id) => {
+    const note = get().notes.find(n => n.id === id);
+
+    // If the note was published, delete the team-graph node too. If that fails,
+    // surface the error to the caller but still continue with local deletion so
+    // the user isn't stuck with a stale row in their sidebar.
+    let unpublishedFromTeam = false;
+    let teamError: string | undefined;
+    if (note?.isPublished && note.publishedNodeId) {
+      const token = useAuthStore.getState().token;
+      if (token) {
+        const result = await deleteTeamGraphNode(note.publishedNodeId, token);
+        if (result.error) {
+          teamError = result.error.message;
+        } else {
+          unpublishedFromTeam = true;
+        }
+      } else {
+        teamError = 'Not signed in — could not remove from team graph';
+      }
+    }
+
     await idb.deleteNote(id);
     set(state => ({
       notes: state.notes.filter(n => n.id !== id),
       activeNoteId: state.activeNoteId === id ? null : state.activeNoteId,
     }));
+    return { unpublishedFromTeam, teamError };
   },
 
   setActiveNote: (id) => set({ activeNoteId: id }),

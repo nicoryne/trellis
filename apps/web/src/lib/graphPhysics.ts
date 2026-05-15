@@ -35,17 +35,24 @@ export interface PhysicsConfig {
   restKineticEnergy: number;
   /** Consecutive at-rest frames required before pausing the rAF loop. */
   restFramesRequired: number;
+  /**
+   * Random per-frame force injected into every free node. Acts like thermal
+   * jitter — keeps the system continuously breathing instead of fully dying,
+   * which is what gives Obsidian's graph its "alive" feel.
+   */
+  thermalNoise: number;
 }
 
 export const DEFAULT_PHYSICS: PhysicsConfig = {
   centerForce: 0.0004,
-  repelForce: 450,
-  linkForce: 0.015,
-  linkDistance: 75,
-  damping: 0.88,
-  maxSpeed: 0.65,
-  restKineticEnergy: 0.05,
-  restFramesRequired: 30,
+  repelForce: 750,
+  linkForce: 0.04,
+  linkDistance: 120,
+  damping: 0.92,
+  maxSpeed: 4.0,
+  restKineticEnergy: 0.001,
+  restFramesRequired: 600,
+  thermalNoise: 0.025,
 };
 
 export interface PhysicsRunner {
@@ -132,6 +139,13 @@ export function createPhysicsRunner(
           fx += (dx / d) * stretch;
           fy += (dy / d) * stretch;
         });
+
+        // 5. Thermal jitter — small random per-frame impulse so the system
+        // never fully dies. The springs and center force keep nodes from
+        // drifting; this just adds the subtle continuous motion that makes
+        // a graph feel alive instead of frozen.
+        fx += (Math.random() - 0.5) * cfg.thermalNoise;
+        fy += (Math.random() - 0.5) * cfg.thermalNoise;
 
         // Integrate with damping + speed clamp
         const v = vel.get(id) ?? [0, 0];

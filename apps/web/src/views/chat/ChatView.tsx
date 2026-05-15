@@ -242,9 +242,12 @@ export const ChatView: React.FC = () => {
       </div>
       </div>
 
-      {/* Sibling of .chat-content — escapes the dim cascade */}
+      {/* Sibling of .chat-content — escapes the dim cascade.
+          Only shows when we're actually grepping the KB (overlayActive is set
+          by startStreaming when there are real citations); during isPending
+          we just dim + show the thinking dots. */}
       <QueryOverlay
-        active={isPending || overlayActive}
+        active={overlayActive}
         citedNodeIds={citedNodeIds}
         token={token}
         onDismiss={() => setOverlayActive(false)}

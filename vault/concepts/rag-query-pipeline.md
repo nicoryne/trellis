@@ -5,7 +5,7 @@ status: active
 tags: [pipeline, ai, trellis, retrieval]
 sources: [trellis-project-architecture, trellis-product-requirements, trellis-implementation-plan]
 created: 2026-05-12
-updated: 2026-05-14
+updated: 2026-05-15
 ---
 
 # RAG query pipeline
@@ -15,7 +15,7 @@ The retrieval and synthesis pipeline behind [[trellis|Trellis]]'s chat-with-team
 ## Sequence
 
 1. User submits a query in the chat input.
-2. Backend embeds the query using [[gemini|`text-embedding-004`]] (768-d).
+2. Backend embeds the query using [[gemini|`gemini-embedding-001`]] with `outputDimensionality: 768` (architecture spec called for `text-embedding-004`, which is not exposed by `@google/generative-ai`).
 3. Backend runs cosine-similarity search in [[postgres-pgvector]]:
    ```sql
    SELECT id, title, summary
@@ -27,7 +27,7 @@ The retrieval and synthesis pipeline behind [[trellis|Trellis]]'s chat-with-team
 5. **Filter** expanded set: keep only nodes with cosine similarity > **0.55** to the query.
 6. Construct context as a JSON array of `{ id, title, summary, body, type }`.
 7. Stream Gemini Pro response with a system prompt that enforces grounding rules (see below).
-8. Frontend parses inline `[node_id]` markers into citation chips linked to summary panels.
+8. Frontend parses inline `[node_id]` markers into clickable [[trellis-retrieval-implementation|CitationChip]]s. Each chip's click opens the `NodeSummaryPanel` for the cited node. The parser accepts both full 36-char UUIDs and 8–12 char hex-prefix IDs (the API returns the prefix form) and resolves them against the message's `citedNodeIds` list. (commit `6d38070`, 2026-05-15)
 9. **In parallel**, the frontend triggers the [[query-overlay-animation]] using the returned cited node IDs.
 
 ## Grounding rules (system prompt)

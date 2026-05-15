@@ -6,15 +6,15 @@ import './graph-zoom-control.css';
 interface GraphZoomControlProps {
   /** Current zoom expressed as a percentage of "fit-all" zoom (100% = all nodes visible). */
   zoomPercent: number;
-  /** Range 20–150. */
+  /** Range 50–500. */
   onChange: (pct: number) => void;
-  /** Reset to 100% (fit all) — also re-centers the view. */
+  /** Reset to 100% — re-centers the view on the graph. */
   onReset?: () => void;
 }
 
-const MIN = 20;
-const MAX = 150;
-const STEP = 5;
+const MIN = 50;
+const MAX = 500;
+const STEP = 10;
 
 export const GraphZoomControl: React.FC<GraphZoomControlProps> = ({
   zoomPercent,
@@ -26,6 +26,19 @@ export const GraphZoomControl: React.FC<GraphZoomControlProps> = ({
 
   return (
     <div className="graph-zoom-control" role="group" aria-label="Graph zoom">
+      {onReset && (
+        <button
+          type="button"
+          className="graph-zoom-fullview"
+          onClick={onReset}
+          aria-label="Fit to view (100%)"
+          title="Fit to view"
+        >
+          <Maximize2 size={13} aria-hidden />
+          <span>Full view</span>
+        </button>
+      )}
+
       <button
         type="button"
         className="graph-zoom-btn"
@@ -59,18 +72,6 @@ export const GraphZoomControl: React.FC<GraphZoomControlProps> = ({
       </button>
 
       <span className="graph-zoom-value" aria-live="polite">{clamped}%</span>
-
-      {onReset && (
-        <button
-          type="button"
-          className="graph-zoom-btn graph-zoom-btn--reset"
-          onClick={onReset}
-          aria-label="Fit to view (100%)"
-          title="Fit to view"
-        >
-          <Maximize2 size={13} aria-hidden />
-        </button>
-      )}
     </div>
   );
 };

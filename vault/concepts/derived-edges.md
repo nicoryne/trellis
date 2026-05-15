@@ -5,7 +5,7 @@ status: active
 tags: [graph, retrieval, trellis, ui]
 sources: [trellis-implementation-plan, trellis-seed-data-analysis]
 created: 2026-05-14
-updated: 2026-05-14
+updated: 2026-05-15
 ---
 
 # Derived edges (Obsidian-style connections)
@@ -33,13 +33,14 @@ A new synthetic node type **`classification`** (not in the original [[trellis-da
 
 Implemented in `apps/web/src/lib/graphUtils.ts` and the two graph views. Same treatment in both [[trellis-capture-implementation|personal]] and [[trellis-govern-implementation|team]] graphs:
 
-| Edge type | Style | Opacity | Width | Color |
-|---|---|---|---|---|
-| `mentions` (explicit, from auto-organize) | solid | 0.35 | 0.75 | `#21262d` |
-| `about` (Phase 2 hub) | dotted | 0.15 | 0.40 | `#21262d` |
-| `related_to` (Phases 1, 3, 4) | dashed `[4, 3]` | 0.25 | 0.50 | `#30363d` |
+| Edge type | Provenance | Style | Opacity | Width | Color |
+|---|---|---|---|---|---|
+| `linked_to` (author-stated wikilink) | **human** — see [[note-wikilinks]] | **solid** | **0.7** | **1.2** | **`#9d4edd` (insight purple)** |
+| `mentions` (explicit, from auto-organize) | AI extraction | solid | 0.35 | 0.75 | `#21262d` |
+| `related_to` (Phases 1, 3, 4) | derived | dashed `[4, 3]` | 0.25 | 0.50 | `#30363d` |
+| `about` (Phase 2 hub) | derived | dotted | 0.15 | 0.40 | `#21262d` |
 
-`mentions` is the loudest visually; `about` is the quietest; `related_to` sits in the middle as a "suggested neighbor" cue. On node hover, connected edges brighten to opacity 0.6 — borrowed from Obsidian's neighbor-highlight pattern.
+Strict hierarchy: **author-stated > AI-extracted > AI-derived > scaffolding**. `linked_to` (the wikilink edge, added 2026-05-15 alongside this concept — not itself a *derived* edge but shares the visual layer) is the loudest because it's the only edge a human explicitly authored. `about` is the quietest because it's pure structural scaffolding. On node hover, connected edges brighten to opacity 0.6 — borrowed from Obsidian's neighbor-highlight pattern.
 
 ## Why it exists
 

@@ -49,6 +49,16 @@ export async function createNote(
   return note;
 }
 
+/**
+ * Write a fully-formed PersonalNote (with caller-supplied id and timestamps)
+ * straight into the notes store. Used by the personal-notes seed so wikilink
+ * targets resolve to deterministic IDs across reloads.
+ */
+export async function putNote(note: PersonalNote): Promise<void> {
+  const db = await getDB();
+  await db.put('notes', note);
+}
+
 export async function getNote(id: string): Promise<PersonalNote | undefined> {
   const db = await getDB();
   return db.get('notes', id);
@@ -128,6 +138,27 @@ export async function updateFolder(id: string, updates: Partial<Pick<NoteFolder,
 export async function deleteFolder(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('folders', id);
+}
+
+// ─── Graph positions ────────────────────────────────────────────────────────
+// Persist node positions for the personal graph so the layout looks the same
+// on every reload. Stored as a single record under personalGraph[positions]
+// to avoid a DB version bump; payload is { [nodeId]: { x, y } }.
+
+const POSITIONS_KEY = 'positions';
+
+export type GraphPositions = Record<string, { x: number; y: number }>;
+
+export async function getGraphPositions(): Promise<GraphPositions> {
+  const db = await getDB();
+  const record = await db.get('personalGraph', POSITIONS_KEY);
+  if (!record) return {};
+  return (record.data as GraphPositions) ?? {};
+}
+
+export async function saveGraphPositions(positions: GraphPositions): Promise<void> {
+  const db = await getDB();
+  await db.put('personalGraph', { id: POSITIONS_KEY, data: positions });
 }
 
 /** Resets the DB connection for test isolation. */

@@ -172,3 +172,20 @@ export async function getNodeCount(): Promise<number> {
   const result = await pool.query('SELECT COUNT(*)::int AS count FROM team_graph_nodes');
   return result.rows[0].count;
 }
+
+/**
+ * Delete a team graph node. Connected edges cascade via the FK constraint
+ * (team_graph_edges.{source,target}_node_id ON DELETE CASCADE).
+ * Returns the deleted row's id + contributor_id, or null if not found.
+ */
+export async function deleteNodeById(
+  nodeId: string
+): Promise<{ id: string; contributor_id: string | null } | null> {
+  const result = await pool.query(
+    `DELETE FROM team_graph_nodes
+     WHERE id = $1
+     RETURNING id, contributor_id`,
+    [nodeId]
+  );
+  return result.rows[0] ?? null;
+}

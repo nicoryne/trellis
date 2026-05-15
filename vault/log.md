@@ -2,7 +2,7 @@
 title: Log
 type: log
 status: active
-updated: 2026-05-14
+updated: 2026-05-15
 ---
 
 # Log
@@ -12,6 +12,18 @@ Chronological, append-only. Most recent entry at the top. Each entry starts with
 Tip: `grep "^## \[" log.md | head -5` yields the last 5 entries.
 
 ---
+
+## [2026-05-15] ingest | Structured organize panel + note wikilinks (commit `d799477`)
+
+Large refactor to the TextCapture surface and the personal-graph data model. Auto-organize-on-save is replaced by an explicit **"Organize with Gemini" button** inside a new right-rail [[trellis-capture-implementation|OrganizePanel]] (collapsible, persisted to `localStorage`). New per-field **provenance model** (`unset` | `ai` | `user`) on `PersonalNote.organizeProvenance`: AI never overwrites user-set fields; when AI disagrees, the value surfaces as inline `Suggested: X (Accept / Dismiss)`. New `dismissedEntityKeys` array tracks AI suggestions the user removed, so subsequent organize runs don't resurrect them. Created the [[note-wikilinks]] concept page documenting the `[[Title]]` syntax: case-insensitive title match, UUID-stable references (rename-safe), soft delete via `deletedAt`, `BacklinksPanel` with ±75-char snippets, `NotePreview` read-only render with `WikilinkChip`s (resolved chip navigates; unresolved chip creates a stub note on click), and a new **`linked_to` edge type** rendered solid `#9d4edd` (insight purple) — visually the loudest edge tier, above AI-extracted `mentions` and derived `related_to` / `about`. Updated [[auto-organization-pipeline]] (manual trigger + provenance table + dismissed-keys behavior + spec-deviation rationale), [[trellis-capture-implementation]] (new file table, soft delete, full noteStore action list, linked_to edges, organize panel as the surface), [[derived-edges]] (added `linked_to` row at the top of the edge-style table with provenance column). New TS types: `NoteLink`, `OrganizeFieldProvenance`, `OrganizeProvenance`, `NoteFolder`; new files: `OrganizePanel.tsx`, `AddEntityForm.tsx`, `LinkQuickPick.tsx`, `NotePreview.tsx`, `BacklinksPanel.tsx`, `WikilinkChip.tsx`, `lib/wikilinks.ts`, `lib/organizeMerge.ts`.
+
+## [2026-05-15] note | Chat/graph centering + clickable short-ID citations (commit `6d38070`)
+
+ChatMessage citation parser revised to accept **both full UUIDs and 8–12 char hex prefix IDs** — the API returns the prefix form, so a subset of citations previously rendered as plain text. New `resolveId(rawId, citedNodeIds)` helper strips hyphens and matches by exact or prefix against the message's `citedNodeIds`; resolved ids open the `NodeSummaryPanel` via `onCitationClick`. Centering fix on the chat-message column and both graph view containers. Updated [[rag-query-pipeline]] (clickable-chips note + embedding-model correction in step 2) and [[trellis-retrieval-implementation]] (new regex + resolveId + centering fix recorded under chat UI).
+
+## [2026-05-15] note | Vercel SPA-rewrite scope + motion dependency (commits `84dcb23`, `6184a87`)
+
+Two small-but-load-bearing deploy fixes. (1) `infra/deploy/vercel.json`: SPA rewrite scoped from `/(.*) → /index.html` to `/((?!assets/|favicon\.png).*) → /index.html` so hashed CSS/JS 404s aren't masked as `text/html` (which browsers refuse to apply, breaking prod builds silently); also removed a stray dev-only `<link>` to `/src/styles/tokens.css` from `apps/web/index.html` since tokens are already bundled via `main.tsx`. (2) Added `motion` as an explicit dep in `apps/web/package.json` — Vercel installs from `apps/web/` only, so a root-only hoist broke `tsc`. Recorded as cautionary patterns in [[trellis-retrieval-implementation]]'s deployment section.
 
 ## [2026-05-14] note | Audio transcription migrated from Whisper to Gemini Flash
 
