@@ -89,7 +89,7 @@ export const ChatView: React.FC = () => {
         },
         onError: (message) => {
           console.error('[chat] Stream error:', message);
-          finishStreaming('', 'refuse', 0);
+          finishStreaming('', null, 0);
         },
       });
     } catch (err) {
