@@ -1,5 +1,6 @@
 // Node colors from design-guidelines.md §2.5 — do not change without updating the spec
 import type { PersonalNote } from '../types/index';
+import { parseWikilinks, resolveWikilinks } from './wikilinks';
 
 export const NODE_COLORS: Record<string, string> = {
   insight: '#9d4edd',   // personal notes are "insights" — purple
@@ -15,7 +16,7 @@ export const NODE_COLORS: Record<string, string> = {
   classification: '#484f58',
 };
 
-// Classification label display names
+// Classification label display names — used by Phase 2 hub-node labels.
 const CLASSIFICATION_LABELS: Record<string, string> = {
   strategy: 'Strategy',
   observation: 'Observation',
@@ -35,6 +36,8 @@ export interface CytoscapeNodeData {
   color: string;
   noteId?: string;
   isHub?: boolean; // Phase 2: classification hub nodes are rendered larger
+  isGhost?: boolean; // unresolved [[wikilink]] — placeholder for a note that doesn't exist yet
+  ghostLabel?: string; // raw wikilink label, used to prefill title on click
 }
 
 export interface CytoscapeEdgeData {
@@ -62,7 +65,7 @@ export function notesToCytoscapeElements(notes: PersonalNote[]): CytoscapeElemen
   const seenEntities = new Set<string>(); // "type:name" dedup key
   const classificationNotes = new Map<string, string[]>(); // classification → noteIds[]
 
-  // Track which entities each note mentions for Phase 1 + 4
+  // Track which entities each note mentions for Phase 1 + 4 derived edges.
   const noteEntities = new Map<string, Set<string>>(); // noteId → Set<entityNodeId>
   const entityNotes = new Map<string, Set<string>>();   // entityNodeId → Set<noteId>
 
@@ -78,7 +81,6 @@ export function notesToCytoscapeElements(notes: PersonalNote[]): CytoscapeElemen
       },
     });
 
-    // Track classification for Phase 2
     const cls = note.classification;
     if (cls) {
       if (!classificationNotes.has(cls)) classificationNotes.set(cls, []);
@@ -93,7 +95,6 @@ export function notesToCytoscapeElements(notes: PersonalNote[]): CytoscapeElemen
 
       entityIds.add(entityNodeId);
 
-      // Track reverse mapping for Phase 4
       if (!entityNotes.has(entityNodeId)) entityNotes.set(entityNodeId, new Set());
       entityNotes.get(entityNodeId)!.add(note.id);
 
@@ -122,7 +123,9 @@ export function notesToCytoscapeElements(notes: PersonalNote[]): CytoscapeElemen
     noteEntities.set(note.id, entityIds);
   }
 
-  // Phase 1: Create note ↔ note edges for insights sharing 2+ entities
+  // Phase 1 (derived): Note↔Note `related_to` for insights sharing 2+ entities.
+  // Per vault/concepts/derived-edges.md — these surface latent topical clusters
+  // and render at low opacity so they're "structural scaffolding."
   const noteIds = notes.map(n => n.id);
   const addedRelatedEdges = new Set<string>();
 
@@ -132,13 +135,8 @@ export function notesToCytoscapeElements(notes: PersonalNote[]): CytoscapeElemen
       const b = noteIds[j];
       const entitiesA = noteEntities.get(a) ?? new Set();
       const entitiesB = noteEntities.get(b) ?? new Set();
-
-      // Count shared entities
       let shared = 0;
-      for (const e of entitiesA) {
-        if (entitiesB.has(e)) shared++;
-      }
-
+      for (const e of entitiesA) if (entitiesB.has(e)) shared++;
       if (shared >= 2) {
         const edgeKey = `${a}-${b}`;
         if (!addedRelatedEdges.has(edgeKey)) {
@@ -171,10 +169,56 @@ export function notesToCytoscapeElements(notes: PersonalNote[]): CytoscapeElemen
     }
   }
 
-  // Phase 2: Classification hub nodes
-  for (const [cls, noteIdList] of classificationNotes.entries()) {
-    if (noteIdList.length < 1) continue; // Only show hubs with at least 1 note
+  // Phase 1c: Ghost nodes for unresolved [[wikilinks]]. The store strips
+  // unresolved links from note.links at save time, so we re-parse each body
+  // here and emit one shared ghost node per unique label (case-insensitive).
+  // Lets users see "notes that should exist" alongside ones that do.
+  const ghostIdByKey = new Map<string, string>();
+  const addedGhostEdges = new Set<string>();
+  for (const note of notes) {
+    if (!note.body) continue;
+    const tokens = parseWikilinks(note.body);
+    if (tokens.length === 0) continue;
+    const { links } = resolveWikilinks(tokens, notes, note.id);
+    for (const link of links) {
+      if (link.targetNoteId) continue;
+      const labelKey = link.displayLabel.trim().toLowerCase();
+      if (!labelKey) continue;
+      let ghostId = ghostIdByKey.get(labelKey);
+      if (!ghostId) {
+        ghostId = `ghost-${labelKey.replace(/[^a-z0-9]+/g, '-')}`;
+        ghostIdByKey.set(labelKey, ghostId);
+        elements.push({
+          data: {
+            id: ghostId,
+            label: link.displayLabel,
+            type: 'ghost',
+            color: '#9d4edd',
+            isGhost: true,
+            ghostLabel: link.displayLabel,
+          },
+        });
+      }
+      const edgeKey = `${note.id}-${ghostId}`;
+      if (addedGhostEdges.has(edgeKey)) continue;
+      addedGhostEdges.add(edgeKey);
+      elements.push({
+        data: {
+          id: `linked-ghost-${note.id}-${ghostId}`,
+          source: note.id,
+          target: ghostId,
+          edgeType: 'linked_to_ghost',
+        },
+      });
+    }
+  }
 
+  // Phase 2 (derived): Classification hub nodes + about edges.
+  // Per vault/concepts/derived-edges.md — synthetic hub per classification
+  // value, rendered as muted diamonds at very low opacity so they read as
+  // structural scaffolding, not content.
+  for (const [cls, noteIdList] of classificationNotes.entries()) {
+    if (noteIdList.length < 1) continue;
     const hubId = `hub-${cls}`;
     elements.push({
       data: {
@@ -185,7 +229,6 @@ export function notesToCytoscapeElements(notes: PersonalNote[]): CytoscapeElemen
         isHub: true,
       },
     });
-
     for (const nId of noteIdList) {
       elements.push({
         data: {
@@ -198,21 +241,18 @@ export function notesToCytoscapeElements(notes: PersonalNote[]): CytoscapeElemen
     }
   }
 
-  // Phase 4: Entity ↔ entity co-occurrence edges (2+ shared insights)
-  const entityIds = Array.from(entityNotes.keys());
-  for (let i = 0; i < entityIds.length; i++) {
-    for (let j = i + 1; j < entityIds.length; j++) {
-      const eA = entityIds[i];
-      const eB = entityIds[j];
+  // Phase 4 (derived): Entity↔Entity co-occurrence — two entities appearing
+  // together in ≥2 insights. Renders as `related_to` at the same low-opacity
+  // tier as Phase 1.
+  const entityIdList = Array.from(entityNotes.keys());
+  for (let i = 0; i < entityIdList.length; i++) {
+    for (let j = i + 1; j < entityIdList.length; j++) {
+      const eA = entityIdList[i];
+      const eB = entityIdList[j];
       const notesA = entityNotes.get(eA)!;
       const notesB = entityNotes.get(eB)!;
-
-      // Count co-occurrences
       let cooccurrences = 0;
-      for (const n of notesA) {
-        if (notesB.has(n)) cooccurrences++;
-      }
-
+      for (const n of notesA) if (notesB.has(n)) cooccurrences++;
       if (cooccurrences >= 2) {
         elements.push({
           data: {

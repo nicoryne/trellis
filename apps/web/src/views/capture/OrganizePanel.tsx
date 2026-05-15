@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Sparkles, Plus, Link2, X } from 'lucide-react';
+import { GeminiIcon } from '../../components/GeminiIcon';
 import type { Entity, NoteClassification, PersonalNote } from '../../types/index';
 import { useNoteStore } from '../../store/noteStore';
 import { AddEntityForm } from './AddEntityForm';
@@ -104,9 +105,7 @@ export function OrganizePanel(props: Props) {
                 className="entity-chip-dot"
                 style={{ backgroundColor: ENTITY_COLORS[entity.type] ?? 'var(--text-muted)' }}
               />
-              <span style={{ color: ENTITY_COLORS[entity.type] ?? 'var(--text-primary)' }}>
-                {entity.name}
-              </span>
+              <span className="entity-chip-name">{entity.name}</span>
               <span className="entity-chip-type">[{entity.type}]</span>
               <button
                 type="button"
@@ -219,7 +218,7 @@ export function OrganizePanel(props: Props) {
           disabled={disabled}
           onClick={onOrganize}
         >
-          <Sparkles size={14} />
+          <GeminiIcon size={16} />
           {isOrganizing ? 'Organizing…' : 'Organize with Gemini'}
         </button>
         {organizeError && <div className="organize-error">{organizeError}</div>}

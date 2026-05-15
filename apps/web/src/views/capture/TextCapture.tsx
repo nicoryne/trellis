@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useNoteStore } from '../../store/noteStore';
 import { useAuthStore } from '../../store/authStore';
 import { organizeNote } from '../../api/client';
 import { OrganizePanel } from './OrganizePanel';
 import { NotePreview } from './NotePreview';
 import { BacklinksPanel } from './BacklinksPanel';
+import { LocalGraphView } from '../graph/LocalGraphView';
 import type { NoteClassification } from '../../types/index';
 
 const ORGANIZE_MIN_CHARS = 20;
@@ -32,8 +34,22 @@ export default function TextCapture() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noteIdRef = useRef<string | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const activeNote = notes.find(n => n.id === activeNoteId) ?? null;
+
+  // Pre-fill the title when arriving via a ghost-node click (graph view
+  // → unresolved [[wikilink]] → create note). Clear the router state so a
+  // refresh doesn't re-trigger the prefill.
+  useEffect(() => {
+    const state = location.state as { prefillTitle?: string } | null;
+    if (state?.prefillTitle && !activeNoteId) {
+      setTitle(state.prefillTitle);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -180,6 +196,8 @@ export default function TextCapture() {
           <NotePreview body={body} sourceNoteId={activeNote?.id ?? null} />
 
           <BacklinksPanel activeNoteId={activeNote?.id ?? null} />
+
+          <LocalGraphView focusNoteId={activeNote?.id ?? null} />
         </div>
       </div>
 

@@ -5,7 +5,7 @@ status: active
 tags: [trellis, retrieval, implementation, nicolo, rag, chat, deployment]
 sources: [trellis-implementation-plan, trellis-project-architecture]
 created: 2026-05-14
-updated: 2026-05-14
+updated: 2026-05-15
 ---
 
 # Trellis retrieval domain — implementation
@@ -129,7 +129,9 @@ Phases 1, 3, 4 use `edge_type = 'related_to'`; Phase 2 uses `about`. Visual diff
 - **Dim cascade isolation**: `.chat-content` wrapper now carries the dim state (`opacity: 0.32; filter: saturate(0.5); pointer-events: none`); QueryOverlay and NodeSummaryPanel are siblings of `.chat-content`, so they escape the dim cascade and render at full opacity above the dimmed chat.
 - **Assistant avatar** (commit `54120e7`): uses the new [[trellis-logo|Logo]] component (`size={20}`) tinted `accent-primary` inside a pill — replaces the prior 3-diamonds SVG icon and reinforces brand in the conversation.
 - **Message width**: `max-width: 880px` per message for readability on wide displays.
-- **Citation parsing**: regex matches UUIDs in brackets — `/\[([a-f0-9-]{36}(?:\s*,\s*[a-f0-9-]{36})*)\]/g`.
+- **Citation parsing** (revised commit `6d38070`, 2026-05-15): regex now accepts **both full UUIDs and 8–12 char hex prefix IDs** — `/\[([a-f0-9]{4,12}(?:-[a-f0-9-]{0,31})?(?:\s*,\s*[a-f0-9]{4,12}(?:-[a-f0-9-]{0,31})?)*)\]/g`. A `resolveId(rawId, citedNodeIds)` helper strips hyphens and matches either by exact UUID or by prefix against the message's `citedNodeIds` list (the API returns first-8-hex-char IDs to keep streamed payloads compact). Indices that fail to resolve are emitted as plain text rather than broken chips.
+- **Clickable citations**: each `CitationChip` index click invokes `onCitationClick(nodeId)` which opens the `NodeSummaryPanel` for the cited node. Previously some prefix-ID citations rendered as plain text because the regex required full UUIDs; the 2026-05-15 fix closes that gap.
+- **Centering fix** (commit `6d38070`): chat-message column and both graph views had off-center root containers; corrected so the chat conversation and the graph canvas center within the available width on standard viewports.
 
 ## Query overlay (`views/chat/QueryOverlay.tsx`)
 
@@ -148,7 +150,8 @@ Phases 1, 3, 4 use `edge_type = 'related_to'`; Phase 2 uses `about`. Visual diff
 
 ## Deployment
 
-- **Frontend**: Vercel, config at `infra/deploy/vercel.json`. Rewrites `/(.*)` → `/index.html` for SPA routing; `/assets/(.*)` cache `max-age=31536000, immutable`
+- **Frontend**: Vercel, config at `infra/deploy/vercel.json`. SPA rewrite **scoped to non-asset paths** (revised commit `84dcb23`, 2026-05-15): `/((?!assets/|favicon\.png).*)` → `/index.html`. Pre-fix the rewrite was `/(.*) → /index.html`, which caught hashed CSS/JS 404s and served them as `text/html`; browsers refused to apply them due to MIME strictness, breaking production builds with no obvious error. `/assets/(.*)` cache `max-age=31536000, immutable`.
+- **Index.html cleanup** (commit `84dcb23`): removed a stray dev-only `<link rel="stylesheet" href="/src/styles/tokens.css">` that 404'd in production; `tokens.css` is already bundled via `main.tsx`'s import graph.
 - **Backend**: Railway, Docker via `apps/api/Dockerfile`
 - **Health check**: `GET /api/health` → `{ status: 'healthy' }`
 - **Environment variables**:
@@ -165,6 +168,8 @@ Phases 1, 3, 4 use `edge_type = 'related_to'`; Phase 2 uses `about`. Visual diff
   ```
   VITE_API_URL  (empty in dev; Vite proxies /api/* to http://localhost:3000)
   ```
+
+- **Build-time deps fix** (commit `6184a87`, 2026-05-15): `motion` (Framer Motion's modular package) was previously hoisted from a root install but Vercel installs deps from `apps/web/` only, so `tsc` failed on `import { motion } from 'motion/react'`. Added `motion` as an explicit dependency in `apps/web/package.json`. Same pattern to watch for on any new monorepo-shared dep that's actually used in `apps/web/`.
 
 ## Types added (`apps/web/src/types/index.ts`)
 

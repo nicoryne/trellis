@@ -2,22 +2,50 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import cytoscape from 'cytoscape';
-import fcose from 'cytoscape-fcose';
+import cola from 'cytoscape-cola';
 import { useNoteStore } from '../../store/noteStore';
-import {
-  notesToCytoscapeElements,
-  EDGE_COLOR_HOVER,
-} from '../../lib/graphUtils';
-import { createPhysicsRunner, type PhysicsRunner } from '../../lib/graphPhysics';
+import { notesToCytoscapeElements } from '../../lib/graphUtils';
+import { applyGraphDiff, recomputeNodeRadii } from '../../lib/graphDiff';
+import { personalGraphStylesheet, LABEL_ZOOM_THRESHOLD } from '../../lib/graphStyles';
+import { getGraphPositions, saveGraphPositions, type GraphPositions } from '../../lib/idb';
 import { Logo } from '../../components/Logo';
 import { GraphZoomControl } from '../../components/GraphZoomControl';
+import { GraphNodePreview } from '../../components/GraphNodePreview';
+import type { PersonalNote } from '../../types/index';
 
-if (!(cytoscape as any).__fcoseRegistered) {
-  cytoscape.use(fcose);
-  (cytoscape as any).__fcoseRegistered = true;
+const PREVIEW_DELAY_MS = 320;
+const POSITION_SAVE_INTERVAL_MS = 10000;
+const MIN_LAYOUT_SPREAD = 40;
+
+function snapshotPositions(cy: cytoscape.Core): Record<string, { x: number; y: number }> {
+  const out: Record<string, { x: number; y: number }> = {};
+  cy.nodes().forEach((n) => {
+    const p = n.position();
+    out[n.id()] = { x: p.x, y: p.y };
+  });
+  return out;
 }
 
-const LABEL_ZOOM_THRESHOLD = 0.75;
+function isCacheUsable(positions: GraphPositions, ids: string[]): boolean {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let count = 0;
+  for (const id of ids) {
+    const p = positions[id];
+    if (!p) continue;
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+    count++;
+  }
+  if (count < 2) return false;
+  return (maxX - minX) >= MIN_LAYOUT_SPREAD || (maxY - minY) >= MIN_LAYOUT_SPREAD;
+}
+
+if (!(cytoscape as any).__colaRegistered) {
+  cytoscape.use(cola);
+  (cytoscape as any).__colaRegistered = true;
+}
 
 export default function PersonalGraphView() {
   const { notes, loadNotes, setActiveNote } = useNoteStore();
@@ -26,9 +54,17 @@ export default function PersonalGraphView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
   const baseZoomRef = useRef<number>(1);
-  const physicsRef = useRef<PhysicsRunner | null>(null);
-  const pinnedRef = useRef<Set<string>>(new Set());
-  const searchRef = useRef('');
+  const layoutRef = useRef<cytoscape.Layouts | null>(null);
+  const layoutSettledRef = useRef(false);
+  const notesRef = useRef<PersonalNote[]>([]);
+  const elementsRef = useRef<ReturnType<typeof notesToCytoscapeElements>>([]);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [previewState, setPreviewState] = useState<{
+    note: PersonalNote;
+    anchor: { x: number; y: number };
+  } | null>(null);
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [graphReady, setGraphReady] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -36,10 +72,77 @@ export default function PersonalGraphView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keep searchRef in sync so event handlers can read current filter
-  useEffect(() => { searchRef.current = search; }, [search]);
+  useEffect(() => { notesRef.current = notes; }, [notes]);
+
+  const cancelPreview = useCallback(() => {
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    setPreviewState(null);
+  }, []);
+
+  const schedulePreview = useCallback((noteId: string, anchor: { x: number; y: number }) => {
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    previewTimerRef.current = setTimeout(() => {
+      const note = notesRef.current.find(n => n.id === noteId);
+      if (note) setPreviewState({ note, anchor });
+    }, PREVIEW_DELAY_MS);
+  }, []);
 
   const elements = useMemo(() => notesToCytoscapeElements(notes), [notes]);
+  useEffect(() => { elementsRef.current = elements; }, [elements]);
+
+  useEffect(() => {
+    if (elements.length > 0 && !graphReady) setGraphReady(true);
+  }, [elements.length, graphReady]);
+
+  // Spotlight helpers — same shape as TeamGraphView. Extracted so the
+  // mouseout cleanup, the container-level mouseleave safety net, and the
+  // tap-on-entity (persistent dim) all share one definition. Inline style
+  // bypasses from prior spotlights are stripped first so consecutive
+  // applications don't accumulate.
+  const clearSpotlight = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.nodes().removeStyle();
+    cy.edges().removeStyle();
+  }, []);
+
+  const applySpotlight = useCallback((nodeId: string) => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const node = cy.getElementById(nodeId);
+    if (!node || node.length === 0 || !node.isNode()) return;
+    cy.nodes().removeStyle();
+    cy.edges().removeStyle();
+
+    const nbNodes = node.neighborhood().nodes();
+    const nbEdges = node.neighborhood().edges();
+    cy.nodes().not(node).not(nbNodes).style({ opacity: 0.2 });
+    cy.edges().not(nbEdges).style({ opacity: 0.06 });
+
+    // Restore per-type color on the spotlighted node + neighbors so their
+    // identity reads through. Everything else stays grey + dimmed.
+    const colorize = (el: cytoscape.NodeSingular) => {
+      const c = el.data('color') as string | undefined;
+      if (c) el.style({ 'background-color': c, 'shadow-color': c });
+    };
+    nbNodes.forEach(colorize);
+    colorize(node as any);
+
+    // Boost shadow on the spotlighted node — strongest visual cue for the
+    // hover target. Neighbors light up via color + brighter opacity.
+    node.style({
+      'shadow-blur': 20,
+      'shadow-opacity': 0.95,
+      'background-opacity': 1,
+      color: '#e6edf3',
+      'text-opacity': 1,
+    });
+    nbNodes.style({ opacity: 0.85, 'background-opacity': 0.95 });
+    nbEdges.style({ opacity: 0.7, 'line-color': '#fb8500', width: 1.5 });
+  }, []);
 
   const refreshLabelVisibility = useCallback(() => {
     const cy = cyRef.current;
@@ -50,6 +153,11 @@ export default function PersonalGraphView() {
       const forced = n.hasClass('cy-hover') || n.selected();
       n.style('text-opacity', forced || showAll ? 1 : 0);
     });
+    // Edges follow labels: when zoomed out, the canvas reads as a clean
+    // constellation. Hover handlers temporarily override per-edge opacity
+    // inline, so the spotlight effect still surfaces neighborhood edges.
+    if (showAll) cy.edges().removeClass('cy-hidden-by-zoom');
+    else cy.edges().addClass('cy-hidden-by-zoom');
   }, []);
 
   const applyZoomPercent = useCallback((pct: number) => {
@@ -76,291 +184,281 @@ export default function PersonalGraphView() {
     refreshLabelVisibility();
   }, [refreshLabelVisibility]);
 
+  // Mount the graph and start a continuous cola simulation. Cola is the
+  // library the original polish commit (1c836dd) used; it handles drag
+  // disturbance + settle naturally so we don't need the hand-rolled physics
+  // tick from earlier. `infinite: true` keeps the layout alive, which is
+  // what gives Obsidian's graph the "breathing" feel.
   useEffect(() => {
-    if (!containerRef.current || elements.length === 0) return;
+    if (!graphReady || !containerRef.current) return;
+    const containerEl = containerRef.current;
+    let cancelled = false;
 
-    const cy = cytoscape({
-      container: containerRef.current,
-      elements,
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'background-color': 'data(color)',
-            'background-opacity': 0.9,
-            label: 'data(label)',
-            'font-size': 11,
-            'font-family': 'Inter, system-ui, sans-serif',
-            'font-weight': 400,
-            'text-valign': 'bottom',
-            'text-halign': 'center',
-            'text-margin-y': 6,
-            color: '#8b949e',
-            'text-wrap': 'ellipsis',
-            'text-max-width': '100px',
-            'text-outline-color': '#0d1117',
-            'text-outline-width': 2,
-            'text-outline-opacity': 0.8,
-            'text-opacity': 1,
-            width: 14,
-            height: 14,
-            'border-width': 0,
-            'shadow-blur': 12,
-            'shadow-color': 'data(color)',
-            'shadow-offset-x': 0,
-            'shadow-offset-y': 0,
-            'shadow-opacity': 0.6,
-            'overlay-opacity': 0,
-            'transition-property': 'text-opacity',
-            'transition-duration': 180,
-          } as any,
-        },
-        {
-          selector: 'node[?isHub]',
-          style: {
-            shape: 'diamond',
-            width: 22,
-            height: 22,
-            'background-opacity': 0.4,
-            'shadow-opacity': 0.3,
-            'shadow-blur': 8,
-            'font-size': 10,
-            'font-weight': 500,
-            color: '#484f58',
-          } as any,
-        },
-        {
-          selector: 'node:selected',
-          style: {
-            'border-width': 2,
-            'border-color': '#fb8500',
-            'shadow-blur': 24,
-            'shadow-opacity': 0.9,
-            'background-opacity': 1,
-            color: '#e6edf3',
-          } as any,
-        },
-        {
-          selector: 'edge',
-          style: {
-            'line-color': '#21262d',
-            width: 0.75,
-            'curve-style': 'bezier',
-            opacity: 0.35,
-            'overlay-opacity': 0,
-          } as any,
-        },
-        {
-          selector: 'edge[edgeType="related_to"]',
-          style: {
-            'line-style': 'dashed',
-            'line-color': '#30363d',
-            'line-dash-pattern': [4, 3],
-            width: 0.5,
-            opacity: 0.25,
-          } as any,
-        },
-        {
-          selector: 'edge[edgeType="about"]',
-          style: {
-            'line-style': 'dotted',
-            'line-color': '#21262d',
-            width: 0.4,
-            opacity: 0.15,
-          } as any,
-        },
-        {
-          selector: 'edge[edgeType="linked_to"]',
-          style: {
-            'line-style': 'solid',
-            'line-color': '#9d4edd',
-            width: 1.2,
-            opacity: 0.7,
-          } as any,
-        },
-        {
-          selector: 'edge:selected',
-          style: {
-            'line-color': EDGE_COLOR_HOVER,
-            opacity: 0.8,
-            width: 1.5,
-          },
-        },
-      ],
-      layout: { name: 'preset' },
-      userZoomingEnabled: true,
-      userPanningEnabled: true,
-      wheelSensitivity: 0.25,
-    });
+    (async () => {
+      const cached: GraphPositions = await getGraphPositions().catch(() => ({} as GraphPositions));
+      if (cancelled) return;
 
-    cyRef.current = cy;
+      const snapshot = elementsRef.current;
+      const nodeIds: string[] = [];
+      for (const el of snapshot) {
+        if (!('source' in el.data)) nodeIds.push((el.data as any).id as string);
+      }
+      const cacheUsable = isCacheUsable(cached, nodeIds);
 
-    const layout = cy.layout({
-      name: 'fcose',
-      quality: 'default',
-      randomize: true,
-      animate: false,
-      fit: true,
-      padding: 60,
-      nodeDimensionsIncludeLabels: false,
-      gravity: 0.35,
-      gravityRange: 3.8,
-      gravityCompound: 1.0,
-      gravityRangeCompound: 1.5,
-      idealEdgeLength: 75,
-      nodeRepulsion: 4500,
-      edgeElasticity: 0.45,
-      nestingFactor: 0.1,
-      numIter: 2500,
-      tile: true,
-      tilingPaddingVertical: 8,
-      tilingPaddingHorizontal: 8,
-      packComponents: true,
-    } as any);
-    layout.run();
+      const seededElements = cacheUsable
+        ? snapshot.map((el) => {
+            if ('source' in el.data) return el;
+            const p = cached[(el.data as any).id];
+            return p ? ({ ...el, position: p } as any) : el;
+          })
+        : snapshot;
 
-    const onLayoutStop = () => {
-      cy.fit(undefined, 60);
-      const base = cy.zoom();
-      baseZoomRef.current = base;
-      cy.minZoom(base * 0.2);
-      cy.maxZoom(base * 1.5);
-      setZoomPercent(100);
-      refreshLabelVisibility();
+      const cy = cytoscape({
+        container: containerEl,
+        elements: seededElements as any,
+        style: personalGraphStylesheet,
+        layout: { name: 'preset' },
+        // Cytoscape's built-in wheel zoom centers on the cursor. We replace
+        // it with a custom handler below that always centers on the canvas
+        // center — a cluster-centric zoom feels less disorienting.
+        userZoomingEnabled: false,
+        userPanningEnabled: true,
+        // Force the canvas to rasterize at higher pixel density so the graph
+        // stays sharp at deep zoom levels (up to 500%). Default 'auto' uses
+        // window.devicePixelRatio (often 1) and the upscale at 5× looks blurry.
+        // 'auto' uses device pixel ratio (1 on most monitors, 2 on retina).
+        // Was previously forced to 2 for sharpness at 5× zoom, but that's
+        // 4× the pixels per frame for a niche zoom level — trade the deep-
+        // zoom sharpness for smoother continuous motion.
+        pixelRatio: 'auto',
+        textureOnViewport: false,
+        motionBlur: false,
+        // Edges/labels temporarily hide during active pan/zoom — invisible
+        // at rest, big perf win on graphs with many edges. Common cytoscape
+        // pattern; the user only sees the simplification mid-interaction.
+        hideEdgesOnViewport: true,
+        hideLabelsOnViewport: true,
+      } as any);
+      cyRef.current = cy;
+      (window as any).__cy = cy;
 
-      // Degree-scaled radius: leaf nodes 6px, most-connected 18px
-      const maxDeg = cy.nodes().reduce((m, n) => Math.max(m, n.degree()), 0) || 1;
-      cy.nodes().forEach(n => {
-        if (n.data('isHub')) return;
-        const r = 6 + (n.degree() / maxDeg) * 12;
-        n.style({ width: r * 2, height: r * 2 });
+      cy.on('mouseover', 'node', (evt) => {
+        const node = evt.target;
+        node.addClass('cy-hover');
+        applySpotlight(node.id());
+
+        const noteId = node.data('noteId') as string | undefined;
+        if (noteId) {
+          const rp = node.renderedPosition();
+          schedulePreview(noteId, { x: rp.x, y: rp.y });
+        }
       });
 
-      // Obsidian-style force simulation: settles to equilibrium, pauses at rest
-      physicsRef.current = createPhysicsRunner(cy, (id) => pinnedRef.current.has(id));
-      physicsRef.current.start();
-    };
-    cy.one('layoutstop', onLayoutStop);
-
-    // Elastic drag — pin node during grab, release with momentum
-    let dragLastPos: { x: number; y: number } | null = null;
-    let dragLastTime = 0;
-    let dragVX = 0, dragVY = 0;
-
-    cy.on('grabon', 'node', (e) => {
-      pinnedRef.current.add(e.target.id());
-      dragLastPos = { ...e.target.position() };
-      dragLastTime = performance.now();
-      dragVX = 0; dragVY = 0;
-    });
-
-    cy.on('drag', 'node', (e) => {
-      const now = performance.now();
-      const pos = e.target.position();
-      if (dragLastPos) {
-        const dt = Math.max(now - dragLastTime, 1);
-        dragVX = (pos.x - dragLastPos.x) / dt * 16;
-        dragVY = (pos.y - dragLastPos.y) / dt * 16;
-      }
-      dragLastPos = { ...pos };
-      dragLastTime = now;
-    });
-
-    cy.on('free', 'node', (e) => {
-      const id = e.target.id();
-      // Inject drag momentum and wake the simulation
-      physicsRef.current?.setNodeVelocity(id, dragVX * 0.35, dragVY * 0.35);
-      pinnedRef.current.delete(id);
-      dragLastPos = null; dragVX = 0; dragVY = 0;
-    });
-
-    // Hover: spotlight neighborhood, dim everything else to ~15%
-    cy.on('mouseover', 'node', (evt) => {
-      const node = evt.target;
-      node.addClass('cy-hover');
-      const nbNodes = node.neighborhood().nodes();
-      const nbEdges = node.neighborhood().edges();
-
-      cy.nodes().not(node).not(nbNodes).style({ opacity: 0.15 });
-      cy.edges().not(nbEdges).style({ opacity: 0.06 });
-
-      node.style({
-        'shadow-blur': 26,
-        'shadow-opacity': 0.95,
-        'background-opacity': 1,
-        color: '#e6edf3',
-        'text-opacity': 1,
+      cy.on('mouseout', 'node', (evt) => {
+        cancelPreview();
+        const node = evt.target;
+        node.removeClass('cy-hover');
+        clearSpotlight();
+        refreshLabelVisibility();
       });
-      nbNodes.style({ opacity: 0.85 });
-      nbEdges.style({ opacity: 0.8, 'line-color': '#fb8500', width: 1.5 });
-    });
 
-    cy.on('mouseout', 'node', (evt) => {
-      const node = evt.target;
-      node.removeClass('cy-hover');
+      // Safety net: cola's continuous motion can make node-level mouseout
+      // unreliable (a node can slide out from under the cursor before the
+      // browser fires mouseout). Catch the case where the cursor leaves the
+      // canvas entirely and force-clear any stuck spotlight state.
+      const handleContainerLeave = () => {
+        cancelPreview();
+        cy.nodes().removeClass('cy-hover');
+        clearSpotlight();
+        refreshLabelVisibility();
+      };
+      containerEl.addEventListener('mouseleave', handleContainerLeave);
+      (cy as any).__onContainerLeave = handleContainerLeave;
 
-      // Remove hover bypasses, letting stylesheet rules take back over
-      cy.nodes().removeStyle('opacity');
-      cy.edges().removeStyle('opacity line-color width');
-
-      // Re-apply active search filter
-      const q = searchRef.current.trim().toLowerCase();
-      if (q) {
-        cy.nodes().forEach(n => {
-          n.style({ opacity: (n.data('label') as string).toLowerCase().includes(q) ? 1 : 0.2 });
-        });
-        cy.edges().style({ opacity: 0.15 });
-      }
-
-      if (!node.selected()) {
-        node.removeStyle('shadow-blur shadow-opacity background-opacity color');
-      }
-
-      refreshLabelVisibility();
-    });
-
-    cy.on('tap', 'node', (evt) => {
-      const node = evt.target;
-      const noteId = node.data('noteId') as string | undefined;
-      if (noteId) {
-        setActiveNote(noteId);
-        navigate('/capture');
-      } else {
+      cy.on('tap', 'node', (evt) => {
+        const node = evt.target;
+        const noteId = node.data('noteId') as string | undefined;
+        if (noteId) {
+          setActiveNote(noteId);
+          navigate('/capture');
+          return;
+        }
+        if (node.data('isGhost')) {
+          const label = (node.data('ghostLabel') as string | undefined) ?? '';
+          setActiveNote(null);
+          navigate('/capture', { state: { prefillTitle: label } });
+          return;
+        }
         const neighborhood = node.neighborhood().add(node);
         cy.elements().not(neighborhood).style({ opacity: 0.2 });
         neighborhood.style({ opacity: 1 });
-      }
-    });
+      });
 
-    cy.on('tap', (evt) => {
-      if (evt.target === cy) {
-        cy.elements().style({ opacity: 1 });
-      }
-    });
+      cy.on('tap', (evt) => {
+        if (evt.target === cy) {
+          cy.elements().style({ opacity: 1 });
+        }
+      });
 
-    cy.on('zoom', () => {
-      const base = baseZoomRef.current || 1;
-      const pct = Math.round((cy.zoom() / base) * 100);
-      const clamped = Math.max(20, Math.min(150, pct));
-      setZoomPercent((prev) => (Math.abs(clamped - prev) >= 1 ? clamped : prev));
-      refreshLabelVisibility();
-    });
+      // Throttle to one update per animation frame — wheel events fire much
+      // faster than the screen can render, and each one paid the cost of a
+      // React state update + a full cy.nodes() traversal in label refresh.
+      let zoomRaf = 0;
+      cy.on('zoom', () => {
+        cancelPreview();
+        if (zoomRaf) return;
+        zoomRaf = requestAnimationFrame(() => {
+          zoomRaf = 0;
+          const base = baseZoomRef.current || 1;
+          const pct = Math.round((cy.zoom() / base) * 100);
+          const clamped = Math.max(50, Math.min(500, pct));
+          setZoomPercent((prev) => (Math.abs(clamped - prev) >= 1 ? clamped : prev));
+          refreshLabelVisibility();
+        });
+      });
+
+      cy.on('pan', cancelPreview);
+      cy.on('grab', 'node', cancelPreview);
+
+      // Custom wheel zoom — anchored to canvas center, ~50% per wheel tick.
+      // (Cytoscape's default handler zooms toward the cursor and was disabled
+      // via userZoomingEnabled: false in the cy() options above.)
+      const handleWheelZoom = (e: WheelEvent) => {
+        e.preventDefault();
+        const base = baseZoomRef.current || 1;
+        const factor = e.deltaY < 0 ? 1.5 : 1 / 1.5;
+        const newZoom = cy.zoom() * factor;
+        const clamped = Math.max(base * 0.5, Math.min(base * 5.0, newZoom));
+        cy.zoom({
+          level: clamped,
+          renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 },
+        });
+      };
+      containerEl.addEventListener('wheel', handleWheelZoom, { passive: false });
+      (cy as any).__onWheelZoom = handleWheelZoom;
+
+      const ro = new ResizeObserver(() => {
+        setContainerSize({ width: containerEl.clientWidth, height: containerEl.clientHeight });
+      });
+      ro.observe(containerEl);
+      setContainerSize({ width: containerEl.clientWidth, height: containerEl.clientHeight });
+      (cy as any).__ro = ro;
+
+      // Continuous cola layout — the simulation runs forever, reacting to
+      // node drag in real time. Matches the polish-commit config.
+      const layout = cy.layout({
+        name: 'cola',
+        infinite: true,
+        fit: false,
+        animate: true,
+        randomize: !cacheUsable,
+        maxSimulationTime: 0,
+        ungrabifyWhileSimulating: false,
+        // Don't pack disconnected components into a side column — let
+        // node-node repulsion push orphans into a natural orbit around the
+        // main cluster.
+        handleDisconnected: false,
+        // Higher threshold lets cola coast when near equilibrium — saves
+        // CPU per frame without killing the live "breathing" feel since
+        // any user interaction (drag, add) re-energizes the sim.
+        convergenceThreshold: 0.05,
+        nodeSpacing: 28,
+        edgeLength: 130,
+        padding: 40,
+      } as any);
+      layout.run();
+      layoutRef.current = layout;
+
+      // Give the simulation a beat to spread nodes, then fit. fcose-free path
+      // means there's no `layoutstop` to hook — schedule the fit instead.
+      setTimeout(() => {
+        if (cancelled || !cyRef.current) return;
+        cy.fit(undefined, 60);
+        const base = cy.zoom();
+        baseZoomRef.current = base;
+        cy.minZoom(base * 0.5);
+        cy.maxZoom(base * 5.0);
+        setZoomPercent(100);
+        refreshLabelVisibility();
+        recomputeNodeRadii(cy);
+        layoutSettledRef.current = true;
+      }, cacheUsable ? 100 : 1400);
+    })();
 
     return () => {
-      layout.stop();
-      physicsRef.current?.stop();
-      physicsRef.current = null;
-      cy.destroy();
+      cancelled = true;
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+      layoutRef.current?.stop();
+      layoutRef.current = null;
+      const cy = cyRef.current;
+      if (cy) {
+        const onLeave = (cy as any).__onContainerLeave as (() => void) | undefined;
+        if (onLeave && containerRef.current) {
+          containerRef.current.removeEventListener('mouseleave', onLeave);
+        }
+        const onWheel = (cy as any).__onWheelZoom as ((e: WheelEvent) => void) | undefined;
+        if (onWheel && containerRef.current) {
+          containerRef.current.removeEventListener('wheel', onWheel);
+        }
+        (cy as any).__ro?.disconnect?.();
+        cy.destroy();
+      }
       cyRef.current = null;
+      layoutSettledRef.current = false;
     };
-  }, [elements, setActiveNote, navigate, refreshLabelVisibility]);
+  }, [graphReady, navigate, setActiveNote, refreshLabelVisibility, cancelPreview, schedulePreview, applySpotlight, clearSpotlight]);
 
-  // Search filter
+  // Incremental updates: when notes change, patch elements in place. Cola
+  // automatically picks up new nodes and edges since the layout is live.
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || !layoutSettledRef.current || elements.length === 0) return;
+    const changed = applyGraphDiff(cy, elements);
+    if (changed) {
+      recomputeNodeRadii(cy);
+      // Re-run cola briefly so new nodes integrate into the layout.
+      layoutRef.current?.stop();
+      const layout = cy.layout({
+        name: 'cola',
+        infinite: true,
+        fit: false,
+        animate: true,
+        randomize: false,
+        maxSimulationTime: 0,
+        ungrabifyWhileSimulating: false,
+        handleDisconnected: false,
+        nodeSpacing: 28,
+        edgeLength: 130,
+      } as any);
+      layout.run();
+      layoutRef.current = layout;
+    }
+  }, [elements]);
+
+  // Periodic save of positions for stable layouts across reloads.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const cy = cyRef.current;
+      if (!cy || !layoutSettledRef.current) return;
+      void saveGraphPositions(snapshotPositions(cy));
+    }, POSITION_SAVE_INTERVAL_MS);
+
+    return () => {
+      clearInterval(interval);
+      const cy = cyRef.current;
+      if (cy && layoutSettledRef.current) {
+        void saveGraphPositions(snapshotPositions(cy));
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
     if (!search.trim()) {
-      cy.elements().style({ opacity: 1 });
+      // Drop inline opacity so the zoom-hide class takes effect again.
+      cy.elements().removeStyle('opacity');
+      refreshLabelVisibility();
       return;
     }
     const q = search.toLowerCase();
@@ -370,7 +468,7 @@ export default function PersonalGraphView() {
       });
     });
     cy.edges().style({ opacity: 0.15 });
-  }, [search]);
+  }, [search, refreshLabelVisibility]);
 
   if (notes.length === 0) {
     return (
@@ -406,6 +504,11 @@ export default function PersonalGraphView() {
 
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
         <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+        <GraphNodePreview
+          note={previewState?.note ?? null}
+          anchor={previewState?.anchor ?? null}
+          bounds={containerSize}
+        />
         <GraphZoomControl
           zoomPercent={zoomPercent}
           onChange={handleZoomChange}

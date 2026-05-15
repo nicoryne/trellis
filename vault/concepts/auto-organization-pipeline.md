@@ -5,12 +5,14 @@ status: active
 tags: [pipeline, ai, trellis, extraction]
 sources: [trellis-product-requirements, trellis-project-architecture, trellis-implementation-plan]
 created: 2026-05-12
-updated: 2026-05-13
+updated: 2026-05-15
 ---
 
 # Auto-organization pipeline
 
-After any personal note is saved, [[trellis|Trellis]] runs the auto-organization pipeline: a **single structured-output [[gemini|Gemini Pro]] call** that returns extracted entities, a classification, and a privilege flag. Sub-5-second latency budget. This is the "intelligent layer" that distinguishes Trellis from a generic note-taking app.
+A **single structured-output [[gemini|Gemini Pro]] call** that returns extracted entities, a classification, and a privilege flag for a personal note. Sub-5-second latency budget. This is the "intelligent layer" that distinguishes Trellis from a generic note-taking app.
+
+**Trigger model (revised 2026-05-15)**: the pipeline runs on **explicit user request** — the "Organize with Gemini" button in the [[trellis-capture-implementation|Organize panel]] — not on debounced auto-save. The earlier auto-trigger model produced surprising overwrites and burned API calls on incomplete drafts; the manual model gives the lawyer authorship over when the AI looks at a note. AudioCapture and ImageCapture continue to call the pipeline once on save (after their respective transcription / vision passes complete) since those flows have a clear "done" moment.
 
 ## Pipeline steps (single Gemini call returns all of this)
 
@@ -49,23 +51,52 @@ After any personal note is saved, [[trellis|Trellis]] runs the auto-organization
 - **Normalization**: canonical entity names (`"Judge Cruz"`, not `"the judge"`)
 - **Route**: `POST /api/organize` — accepts note content (string), returns `{ entities, classification, isPrivileged }`; requires valid JWT
 
+## Frontend integration — the Organize panel
+
+Surface: `apps/web/src/views/capture/OrganizePanel.tsx` (right rail on TextCapture, collapsible, state persisted to `localStorage` under `organize-panel-collapsed`). The pipeline call is gated to bodies of ≥20 characters and runs through `noteStore.applyAiOrganize(noteId, response)`, which delegates the merge to `apps/web/src/lib/organizeMerge.ts`.
+
+**Provenance model.** Each of the three organize fields (entities, classification, privilege) carries a provenance flag: `'unset' | 'ai' | 'user'`. The merge rules:
+
+| Current provenance | AI returns | Behavior |
+|---|---|---|
+| `unset` or `ai` | any value | Apply AI value; flip provenance to `ai`. |
+| `user` | same value as user | No-op. |
+| `user` | different value | **Do not overwrite.** Surface as inline `Suggested: X (Accept / Dismiss)` hint; user explicitly accepts to apply. |
+
+**Entity merge.** Union by `${type}:${name.toLowerCase()}` key. User-added entities are preserved. AI-suggested entities the user has explicitly removed are tracked in `dismissedEntityKeys` and **filtered out of subsequent AI passes** before merge — so re-running organize does not silently re-add what the user just dismissed. The "×" remove button on an AI-provenance chip dismisses; on a user-provenance chip it simply deletes.
+
+**User-overridable controls in the panel:**
+
+- Classification dropdown (6 values) — flips provenance to `user` on change.
+- Privilege checkbox — flips provenance to `user` on change.
+- "+ Add entity" form — user-provenance entity, never displaced by AI.
+- "× Remove" on any entity chip — drops the entity; AI-provenance entities are also added to `dismissedEntityKeys`.
+- "+ Add link" → opens `LinkQuickPick`, inserts `[[Title]]` at cursor (see [[note-wikilinks]]).
+
+The panel footer displays the last-organized timestamp ("3 min ago") and a disabled state below the 20-char threshold so the budget reason is visible.
+
 ## Acceptance criteria (per [[trellis-product-requirements]] §2.3)
 
-- Pipeline runs within 5 seconds of save (acceptable demo latency)
-- Extracted entities appear as **clickable chips** on the note
-- Personal graph updates to show new nodes and edges
-- Note is searchable by any extracted entity name
-- Lawyer can manually correct any extraction error (edit chips, add/remove entities)
+- Pipeline runs within 5 seconds of trigger (acceptable demo latency).
+- Extracted entities appear as **clickable chips** on the note.
+- Personal graph updates to show new nodes and edges.
+- Note is searchable by any extracted entity name.
+- Lawyer can manually correct any extraction error (edit chips, add/remove entities). Satisfied via the Organize panel: per-field provenance + dismiss-and-don't-resurface behavior.
 
 ## Edge cases
 
-- **Extraction failure (API error)**: note is saved without enrichment; a retry button is visible.
-- **Duplicate entities** (same type + name): deduplicated by `type:name` key in `graphUtils.ts`.
+- **Extraction failure (API error)**: note is saved without enrichment; error surfaces inline in the panel footer; "Organize with Gemini" can be re-clicked.
+- **Duplicate entities** (same type + name): deduplicated by `type:name` key in both `organizeMerge.ts` and `graphUtils.ts`.
 - **Low-confidence entities** (below 0.5): excluded entirely (not suggested).
+- **User has edited fields manually before clicking organize**: AI value is held in suggestions, never silently overwrites — see provenance table above.
 
 ## Why a single call
 
 [[trellis-project-architecture]] specifies "single Gemini Pro call with a structured JSON output schema doing extraction + classification + privilege detection in one shot." Multiple round-trips would blow the 5-second budget.
+
+## Deviation from spec — explicit trigger
+
+[[trellis-product-requirements]] §2.3 reads "pipeline runs within 5 seconds **of save**." As shipped, TextCapture runs on **button press**, not auto-save. Rationale recorded in [[trellis-decision-history]]: auto-organize on debounced save (1) caused jarring overwrites mid-draft, (2) burned Gemini calls on incomplete content, and (3) implicitly fought the new provenance model (since "user-set" needed to defeat "ai-suggested"). The button is more honest about cost and authorship. AudioCapture and ImageCapture keep the on-save trigger because their inputs have a clear terminal moment (recording stop, file upload).
 
 ## Relation to other pipelines
 

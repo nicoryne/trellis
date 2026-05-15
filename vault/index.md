@@ -2,7 +2,7 @@
 title: Index
 type: index
 status: active
-updated: 2026-05-14
+updated: 2026-05-15
 ---
 
 # Index
@@ -90,6 +90,7 @@ Catalog of every page in the wiki. Updated on every ingest and every lint.
 - [[ethical-wall]] — Chinese-wall doctrine; V1+ retrieval-filter requirement
 - [[derived-edges]] — Obsidian-style automatic connections in the team and personal graphs: shared-entity, classification-hub, embedding-similarity, entity-co-occurrence
 - [[graph-zoom-control]] — Persistent zoom widget for the personal and team graph views: range 20–150%, gradient slider, fit-to-view reset, adaptive label threshold
+- [[note-wikilinks]] — Author-stated `[[Title]]` linking in personal notes: UUID-stable resolution, soft delete, backlinks panel, solid-purple `linked_to` edges + organize-provenance model
 
 ## Topics
 

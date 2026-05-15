@@ -42,6 +42,22 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'refuse';
 
+/**
+ * Refusal-message variants emitted when retrieval confidence is 'refuse'.
+ * One is selected at random per refused query so the demo doesn't feel scripted.
+ * Each variant carries the same product intent: acknowledge the gap, invite a capture.
+ */
+const REFUSAL_VARIANTS: readonly string[] = [
+  "I don't have firm knowledge that directly addresses this. You may want to capture your own thinking on this topic as a starting point.",
+  "The firm brain doesn't have material covering this question. Consider opening a capture and starting the record yourself — your notes today become tomorrow's institutional memory.",
+  "No published insights in the team graph speak to this directly. This looks like an open area for the firm's knowledge — your capture could be the first entry.",
+  "I couldn't find firm knowledge on this. Rather than synthesize from general legal training, I'd rather defer — this is a good prompt for a fresh personal capture.",
+];
+
+function pickRefusalMessage(): string {
+  return REFUSAL_VARIANTS[Math.floor(Math.random() * REFUSAL_VARIANTS.length)];
+}
+
 export interface RagContext {
   id: string;
   title: string;
@@ -59,20 +75,26 @@ export interface RagResult {
 
 /**
  * Calculate confidence level based on retrieval quality.
- * From architecture §4.3:
- *   High:   3+ nodes above 0.80 similarity
- *   Medium: 2+ nodes above 0.70
- *   Low:    only 1 node above 0.75
- *   Refuse: zero nodes above 0.75
+ *
+ * Thresholds calibrated against text-embedding-004 actual distributions on
+ * the seeded corpus (see diagnostics-similarity.ts). Even tightly-matched
+ * queries (e.g., "How does Judge Buenaventura handle motions" against 6
+ * dedicated Buenaventura insights) cap around 0.80 cosine similarity — the
+ * older 0.80 threshold for "high" was unreachable in practice. Empirical
+ * calibration:
+ *   High:   3+ nodes ≥ 0.75 — multiple strongly-on-topic hits
+ *   Medium: 2+ nodes ≥ 0.70 — solid but thinner hits, or one strong + adjacent
+ *   Low:    1+ node  ≥ 0.60 — a single weakly-related hit
+ *   Refuse: zero nodes ≥ 0.60
  */
 function calculateConfidence(contexts: RagContext[]): ConfidenceLevel {
-  const above080 = contexts.filter((c) => c.similarity >= 0.80).length;
   const above075 = contexts.filter((c) => c.similarity >= 0.75).length;
   const above070 = contexts.filter((c) => c.similarity >= 0.70).length;
+  const above060 = contexts.filter((c) => c.similarity >= 0.60).length;
 
-  if (above080 >= 3) return 'high';
+  if (above075 >= 3) return 'high';
   if (above070 >= 2) return 'medium';
-  if (above075 >= 1) return 'low';
+  if (above060 >= 1) return 'low';
   return 'refuse';
 }
 
@@ -146,7 +168,7 @@ export async function* streamRagResponse(
 ): AsyncGenerator<string> {
   // Refuse if no relevant context
   if (confidence === 'refuse' || contexts.length === 0) {
-    yield "I don't have firm knowledge that directly addresses this. You may want to capture your own thinking on this topic as a starting point.";
+    yield pickRefusalMessage();
     return;
   }
 

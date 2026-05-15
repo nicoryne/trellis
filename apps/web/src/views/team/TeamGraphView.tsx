@@ -1,21 +1,19 @@
 // apps/web/src/views/team/TeamGraphView.tsx
 import { useEffect, useRef, useState, useCallback } from 'react';
 import cytoscape, { Core } from 'cytoscape';
-import fcose from 'cytoscape-fcose';
+import cola from 'cytoscape-cola';
 import { useAuthStore } from '../../store/authStore';
 import { fetchTeamGraph } from '../../api/teamGraph';
-import { createPhysicsRunner, type PhysicsRunner } from '../../lib/graphPhysics';
 import type { TeamGraph } from '../../types/index';
 import { NodeSummaryPanel } from './NodeSummaryPanel';
 import { GraphZoomControl } from '../../components/GraphZoomControl';
+import { LABEL_ZOOM_THRESHOLD } from '../../lib/graphStyles';
 import './team.css';
 
-if (!(cytoscape as any).__fcoseRegistered) {
-  cytoscape.use(fcose);
-  (cytoscape as any).__fcoseRegistered = true;
+if (!(cytoscape as any).__colaRegistered) {
+  cytoscape.use(cola);
+  (cytoscape as any).__colaRegistered = true;
 }
-
-const LABEL_ZOOM_THRESHOLD = 0.75;
 
 const NODE_COLORS: Record<string, string> = {
   insight: '#9d4edd',
@@ -34,9 +32,13 @@ export function TeamGraphView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const baseZoomRef = useRef<number>(1);
-  const physicsRef = useRef<PhysicsRunner | null>(null);
-  const pinnedRef = useRef<Set<string>>(new Set());
+  const layoutRef = useRef<cytoscape.Layouts | null>(null);
   const searchRef = useRef('');
+  // Spotlight state — when a node is selected via tap (and the sidebar is
+  // open), it stays lit even when the user hovers other nodes. On hover-out
+  // we restore the selection spotlight instead of fully clearing.
+  const hoveredIdRef = useRef<string | null>(null);
+  const selectedIdRef = useRef<string | null>(null);
 
   const [graph, setGraph] = useState<TeamGraph | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,6 +59,50 @@ export function TeamGraphView() {
   // Keep searchRef in sync so event handlers can read current filter
   useEffect(() => { searchRef.current = searchQuery; }, [searchQuery]);
 
+  // Strip every hover/selection bypass. The :selected stylesheet rule
+  // re-applies the chosen-state visuals on its own, so we don't need
+  // inline overrides for the focused node.
+  const clearSpotlight = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.nodes().removeStyle();
+    cy.edges().removeStyle();
+  }, []);
+
+  const applySpotlight = useCallback((nodeId: string) => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const node = cy.getElementById(nodeId);
+    if (!node || node.length === 0 || !node.isNode()) return;
+    // Reset first so consecutive spotlights don't stack bypasses.
+    cy.nodes().removeStyle();
+    cy.edges().removeStyle();
+
+    const nbNodes = node.neighborhood().nodes();
+    const nbEdges = node.neighborhood().edges();
+    cy.nodes().not(node).not(nbNodes).style({ opacity: 0.2 });
+    cy.edges().not(nbEdges).style({ opacity: 0.06 });
+
+    // Restore per-type color on the spotlighted node + its neighbors.
+    const colorize = (el: cytoscape.NodeSingular) => {
+      const type = el.data('nodeType') as string | undefined;
+      const c = type ? NODE_COLORS[type] : undefined;
+      if (c) el.style({ 'background-color': c, 'shadow-color': c });
+    };
+    nbNodes.forEach(colorize);
+    colorize(node as any);
+
+    node.style({
+      'shadow-blur': 22,
+      'shadow-opacity': 0.95,
+      'background-opacity': 1,
+      color: '#e6edf3',
+      'text-opacity': 1,
+    });
+    nbNodes.style({ opacity: 0.85, 'background-opacity': 0.95 });
+    nbEdges.style({ opacity: 0.8, 'line-color': '#fb8500', width: 1.5 });
+  }, []);
+
   const refreshLabelVisibility = useCallback(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -66,6 +112,8 @@ export function TeamGraphView() {
       const forced = n.hasClass('cy-hover') || n.selected();
       n.style('text-opacity', forced || showAll ? 1 : 0);
     });
+    if (showAll) cy.edges().removeClass('cy-hidden-by-zoom');
+    else cy.edges().addClass('cy-hidden-by-zoom');
   }, []);
 
   const applyZoomPercent = useCallback((pct: number) => {
@@ -116,10 +164,12 @@ export function TeamGraphView() {
         {
           selector: 'node',
           style: {
-            'background-color': (el: cytoscape.NodeSingular) => NODE_COLORS[el.data('nodeType')] ?? '#7d8590',
-            'background-opacity': 0.9,
-            width: 14,
-            height: 14,
+            // Grey at rest — same as personal graph. Color is restored by
+            // applySpotlight on the hovered/selected node + its neighbors.
+            'background-color': '#3a3f47',
+            'background-opacity': 0.85,
+            width: 32,
+            height: 32,
             label: 'data(label)',
             'font-size': 11,
             'font-family': 'Inter, system-ui, sans-serif',
@@ -135,14 +185,12 @@ export function TeamGraphView() {
             'text-outline-opacity': 0.8,
             'text-opacity': 1,
             'border-width': 0,
-            'shadow-blur': 12,
-            'shadow-color': (el: cytoscape.NodeSingular) => NODE_COLORS[el.data('nodeType')] ?? '#7d8590',
+            'shadow-blur': 4,
+            'shadow-color': '#3a3f47',
             'shadow-offset-x': 0,
             'shadow-offset-y': 0,
-            'shadow-opacity': 0.6,
+            'shadow-opacity': 0.4,
             'overlay-opacity': 0,
-            'transition-property': 'text-opacity',
-            'transition-duration': 180,
           } as any,
         },
         {
@@ -156,11 +204,14 @@ export function TeamGraphView() {
             color: '#e6edf3',
           } as any,
         },
+        // Edge tier hierarchy matches personal graph (vault/concepts/
+        // derived-edges.md): author-stated edges loudest, AI-extracted
+        // medium, derived/scaffolding lowest.
         {
           selector: 'edge',
           style: {
-            width: 0.75,
             'line-color': '#21262d',
+            width: 0.75,
             'curve-style': 'bezier',
             opacity: 0.35,
             'overlay-opacity': 0,
@@ -177,139 +228,121 @@ export function TeamGraphView() {
           } as any,
         },
         {
+          selector: 'edge[edgeType="about"]',
+          style: {
+            'line-style': 'dotted',
+            'line-color': '#21262d',
+            width: 0.4,
+            opacity: 0.15,
+          } as any,
+        },
+        {
+          selector: 'edge[edgeType="linked_to"]',
+          style: {
+            'line-style': 'solid',
+            'line-color': '#9d4edd',
+            width: 1.2,
+            opacity: 0.7,
+          } as any,
+        },
+        {
           selector: 'edge:selected',
           style: {
-            'line-color': '#7d8590',
-            opacity: 0.8,
-            width: 1.5,
+            'line-color': '#fb8500',
+            opacity: 0.9,
+            width: 2.2,
           },
+        },
+        // Hide edges when the user is zoomed out at or below 100%
+        // (refreshLabelVisibility manages the class). Hover handlers still
+        // override inline opacity to surface neighborhood edges.
+        {
+          selector: 'edge.cy-hidden-by-zoom',
+          style: { opacity: 0 } as any,
         },
       ],
       layout: { name: 'preset' },
-      userZoomingEnabled: true,
+      // Custom center-anchored wheel zoom (see handleWheelZoom below).
+      userZoomingEnabled: false,
       userPanningEnabled: true,
-      wheelSensitivity: 0.25,
-    });
+      // Render at higher pixel density so the canvas stays sharp at deep
+      // zoom levels. Default 'auto' is too low for the 5× max we allow.
+      pixelRatio: 'auto',
+      textureOnViewport: false,
+      motionBlur: false,
+      hideEdgesOnViewport: true,
+      hideLabelsOnViewport: true,
+    } as any);
 
     cyRef.current = cy;
 
+    // Continuous cola simulation — same library + config family as the
+    // personal graph so both views feel identical. `infinite: true` keeps the
+    // layout alive forever; cola handles drag-grab natively.
     const layout = cy.layout({
-      name: 'fcose',
-      quality: 'default',
+      name: 'cola',
+      infinite: true,
+      fit: false,
+      animate: true,
       randomize: true,
-      animate: false,
-      fit: true,
-      padding: 60,
-      nodeDimensionsIncludeLabels: false,
-      gravity: 0.35,
-      gravityRange: 3.8,
-      gravityCompound: 1.0,
-      gravityRangeCompound: 1.5,
-      idealEdgeLength: 75,
-      nodeRepulsion: 4500,
-      edgeElasticity: 0.45,
-      nestingFactor: 0.1,
-      numIter: 2500,
-      tile: true,
-      tilingPaddingVertical: 8,
-      tilingPaddingHorizontal: 8,
-      packComponents: true,
+      maxSimulationTime: 0,
+      ungrabifyWhileSimulating: false,
+      handleDisconnected: false,
+      convergenceThreshold: 0.05,
+      nodeSpacing: 28,
+      edgeLength: 130,
+      padding: 40,
     } as any);
     layout.run();
+    layoutRef.current = layout;
 
-    const onLayoutStop = () => {
+    // No `layoutstop` event with infinite cola — give the sim a beat to
+    // spread the nodes, then fit and apply degree-scaled radii.
+    setTimeout(() => {
+      if (!cyRef.current) return;
       cy.fit(undefined, 60);
       const base = cy.zoom();
       baseZoomRef.current = base;
-      cy.minZoom(base * 0.2);
-      cy.maxZoom(base * 1.5);
+      cy.minZoom(base * 0.5);
+      cy.maxZoom(base * 5.0);
       setZoomPercent(100);
       refreshLabelVisibility();
 
-      // Degree-scaled radius: leaf nodes 6px, most-connected 18px
-      const maxDeg = cy.nodes().reduce((m, n) => Math.max(m, n.degree()), 0) || 1;
+      const maxDeg = cy.nodes().reduce((m, n) => Math.max(m, n.degree(true)), 0) || 1;
       cy.nodes().forEach(n => {
-        const r = 6 + (n.degree() / maxDeg) * 12;
+        const r = 16 + (n.degree(true) / maxDeg) * 24;
         n.style({ width: r * 2, height: r * 2 });
       });
+    }, 1400);
 
-      // Obsidian-style force simulation: settles to equilibrium, pauses at rest
-      physicsRef.current = createPhysicsRunner(cy, (id) => pinnedRef.current.has(id));
-      physicsRef.current.start();
-    };
-    cy.one('layoutstop', onLayoutStop);
-
-    // Elastic drag — pin node during grab, release with momentum
-    let dragLastPos: { x: number; y: number } | null = null;
-    let dragLastTime = 0;
-    let dragVX = 0, dragVY = 0;
-
-    cy.on('grabon', 'node', (e) => {
-      pinnedRef.current.add(e.target.id());
-      dragLastPos = { ...e.target.position() };
-      dragLastTime = performance.now();
-      dragVX = 0; dragVY = 0;
-    });
-
-    cy.on('drag', 'node', (e) => {
-      const now = performance.now();
-      const pos = e.target.position();
-      if (dragLastPos) {
-        const dt = Math.max(now - dragLastTime, 1);
-        dragVX = (pos.x - dragLastPos.x) / dt * 16;
-        dragVY = (pos.y - dragLastPos.y) / dt * 16;
-      }
-      dragLastPos = { ...pos };
-      dragLastTime = now;
-    });
-
-    cy.on('free', 'node', (e) => {
-      const id = e.target.id();
-      // Inject drag momentum and wake the simulation
-      physicsRef.current?.setNodeVelocity(id, dragVX * 0.35, dragVY * 0.35);
-      pinnedRef.current.delete(id);
-      dragLastPos = null; dragVX = 0; dragVY = 0;
-    });
-
-    // Hover: spotlight neighborhood, dim everything else to ~15%
+    // Hover spotlight — temporary; mouseout either falls back to the
+    // selected node's spotlight (if sidebar is open) or fully resets.
     cy.on('mouseover', 'node', (e) => {
       const node = e.target;
       node.addClass('cy-hover');
-      const nbNodes = node.neighborhood().nodes();
-      const nbEdges = node.neighborhood().edges();
-
-      cy.nodes().not(node).not(nbNodes).style({ opacity: 0.15 });
-      cy.edges().not(nbEdges).style({ opacity: 0.06 });
-
-      node.style({
-        'shadow-blur': 26,
-        'shadow-opacity': 0.95,
-        'background-opacity': 1,
-        color: '#e6edf3',
-        'text-opacity': 1,
-      });
-      nbNodes.style({ opacity: 0.85 });
-      nbEdges.style({ opacity: 0.8, 'line-color': '#fb8500', width: 1.5 });
+      hoveredIdRef.current = node.id();
+      applySpotlight(node.id());
     });
 
     cy.on('mouseout', 'node', (e) => {
       const node = e.target;
       node.removeClass('cy-hover');
+      hoveredIdRef.current = null;
 
-      // Remove hover bypasses, letting stylesheet rules take back over
-      cy.nodes().removeStyle('opacity');
-      cy.edges().removeStyle('opacity line-color width');
+      // If the sidebar is open on a node, fall back to the selection
+      // spotlight instead of fully clearing. Otherwise reset everything.
+      if (selectedIdRef.current) {
+        applySpotlight(selectedIdRef.current);
+      } else {
+        clearSpotlight();
+      }
 
-      // Re-apply active search filter
+      // Re-apply active search filter (overlays opacity for filtered nodes).
       const q = searchRef.current.trim().toLowerCase();
       if (q) {
         cy.nodes().forEach(n => {
           n.style({ opacity: n.data('label')?.toLowerCase().includes(q) ? 1 : 0.15 });
         });
-      }
-
-      if (!node.selected()) {
-        node.removeStyle('shadow-blur shadow-opacity background-opacity color');
       }
 
       refreshLabelVisibility();
@@ -323,22 +356,76 @@ export function TeamGraphView() {
       if (e.target === cy) setSelectedNodeId(null);
     });
 
+    let zoomRaf = 0;
     cy.on('zoom', () => {
-      const base = baseZoomRef.current || 1;
-      const pct = Math.round((cy.zoom() / base) * 100);
-      const clamped = Math.max(20, Math.min(150, pct));
-      setZoomPercent((prev) => (Math.abs(clamped - prev) >= 1 ? clamped : prev));
-      refreshLabelVisibility();
+      if (zoomRaf) return;
+      zoomRaf = requestAnimationFrame(() => {
+        zoomRaf = 0;
+        const base = baseZoomRef.current || 1;
+        const pct = Math.round((cy.zoom() / base) * 100);
+        const clamped = Math.max(50, Math.min(500, pct));
+        setZoomPercent((prev) => (Math.abs(clamped - prev) >= 1 ? clamped : prev));
+        refreshLabelVisibility();
+      });
     });
 
+    // Custom center-anchored wheel zoom (cytoscape default disabled above).
+    const containerEl = containerRef.current!;
+    const handleWheelZoom = (e: WheelEvent) => {
+      e.preventDefault();
+      const base = baseZoomRef.current || 1;
+      const factor = e.deltaY < 0 ? 1.5 : 1 / 1.5;
+      const newZoom = cy.zoom() * factor;
+      const clamped = Math.max(base * 0.5, Math.min(base * 5.0, newZoom));
+      cy.zoom({
+        level: clamped,
+        renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 },
+      });
+    };
+    containerEl.addEventListener('wheel', handleWheelZoom, { passive: false });
+
+    // Safety net for hover state: cola's continuous motion can make node-
+    // level mouseout unreliable. If the cursor leaves the canvas entirely,
+    // clear any stuck spotlight — unless a node is currently selected
+    // (sidebar open), in which case keep that selection spotlight live.
+    const handleContainerLeave = () => {
+      hoveredIdRef.current = null;
+      cy.nodes().removeClass('cy-hover');
+      if (selectedIdRef.current) applySpotlight(selectedIdRef.current);
+      else clearSpotlight();
+      refreshLabelVisibility();
+    };
+    containerEl.addEventListener('mouseleave', handleContainerLeave);
+
     return () => {
-      layout.stop();
-      physicsRef.current?.stop();
-      physicsRef.current = null;
+      containerEl.removeEventListener('wheel', handleWheelZoom);
+      containerEl.removeEventListener('mouseleave', handleContainerLeave);
+      layoutRef.current?.stop();
+      layoutRef.current = null;
       cy.destroy();
       cyRef.current = null;
     };
-  }, [graph, refreshLabelVisibility]);
+  }, [graph, refreshLabelVisibility, applySpotlight, clearSpotlight]);
+
+  // Selection-driven spotlight: when a node is tapped (opens the sidebar)
+  // its neighborhood stays highlighted until the sidebar is closed (which
+  // sets selectedNodeId back to null via onClose or background-tap).
+  useEffect(() => {
+    selectedIdRef.current = selectedNodeId;
+    const cy = cyRef.current;
+    if (!cy) return;
+    if (selectedNodeId) {
+      // Mirror selection into cytoscape so :selected stylesheet rules apply.
+      cy.$(':selected').unselect();
+      cy.getElementById(selectedNodeId).select();
+      applySpotlight(selectedNodeId);
+    } else {
+      cy.$(':selected').unselect();
+      // Hover takes over if the user is actively hovering; otherwise reset.
+      if (hoveredIdRef.current) applySpotlight(hoveredIdRef.current);
+      else clearSpotlight();
+    }
+  }, [selectedNodeId, applySpotlight, clearSpotlight]);
 
   // Search filter
   useEffect(() => {
@@ -346,7 +433,8 @@ export function TeamGraphView() {
     if (!cy) return;
 
     if (!searchQuery.trim()) {
-      cy.nodes().style({ opacity: 1 });
+      cy.nodes().removeStyle('opacity');
+      refreshLabelVisibility();
       return;
     }
 
@@ -355,7 +443,7 @@ export function TeamGraphView() {
       const matches = node.data('label')?.toLowerCase().includes(q);
       node.style({ opacity: matches ? 1 : 0.15 });
     });
-  }, [searchQuery]);
+  }, [searchQuery, refreshLabelVisibility]);
 
   if (error) {
     return (
