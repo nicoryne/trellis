@@ -13,6 +13,10 @@ Tip: `grep "^## \[" log.md | head -5` yields the last 5 entries.
 
 ---
 
+## [2026-05-15] note | New synthesis topic — embedding-retrieval-citation pipeline
+
+Created [[embedding-retrieval-citation-pipeline]] (topic) as a single thorough end-to-end document covering how a chat query becomes a grounded, cited answer. 13 sections: big-picture flow, embedding (model + when + storage), classifier gate, retrieval (vector search → 1-hop → filter), confidence score (recalibrated rules + the calibration story), synthesis (system prompt + grounding contract), conversational path, citation lifecycle (server emission → regex parsing → resolveId → CitationChip → NodeSummaryPanel click), query overlay gating, reliability/retry policies per call type, end-to-end timeline with millisecond markers, failure-mode table, and "what's deliberately NOT in this pipeline." Pulls together [[rag-query-pipeline]], [[chat-query-classifier]], [[conversational-chat-path]], [[citation-grounding]], [[gemini-retry-backoff]], [[postgres-pgvector]], and [[gemini]] into a single readable artifact. Indexed.
+
 ## [2026-05-15] note | Design decision — graph rest state: color, not grey
 
 Recorded the rest-state inversion as a deliberate design decision in [[node-color-coding]] with a new "Rest-state philosophy" section. Before/after table, rationale (grey-at-rest treated color as a reward and undersold the per-type structure; color-at-rest communicates "map of nine kinds of things" immediately while spotlight grey-out still provides focus), what didn't change (strict UI-vs-data palette separation — accent orange still reserved for cited edges), where it lives (`graphStyles.ts`, `TeamGraphView.tsx`, both views' `applySpotlight`), and the tradeoff at firm scale (V1 may need zoom-based desaturation). Visual parity between personal and team graphs is now part of the spec.

@@ -117,6 +117,7 @@ Catalog of every page in the wiki. Updated on every ingest and every lint.
 - [[trellis-capture-implementation]] — CAPTURE domain (Keith) fully implemented: IDB layer, types, organize service, all capture views, personal graph, seed data
 - [[trellis-govern-implementation]] — GOVERN domain (Gabe) fully implemented: auth, rate limiting, redaction backend + modal, app shell, team graph view, Toast
 - [[trellis-retrieval-implementation]] — RETRIEVAL domain (Nicolo) fully implemented: DB schema, 20-node seed, RAG service, SSE chat, canvas query overlay, deployment, audit fixes
+- [[embedding-retrieval-citation-pipeline]] — End-to-end synthesis: how a chat query becomes a grounded, cited answer. Embedding model + when, vector search + 1-hop expansion, classifier gate, confidence calculation, citation parsing/display/click, end-to-end timeline, failure modes
 
 ## Questions
 
